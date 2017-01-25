@@ -97,9 +97,7 @@ classdef DoubleTrainedEC < EvolutionControl & Observable
 
       % prepare the final population to be returned to CMA-ES
       obj.pop = Population(lambda, dim);
-
-      obj.newModel = ModelFactory.createModel(obj.surrogateOpts.modelType, obj.surrogateOpts.modelOpts, obj.cmaesState.xmean');
-
+      obj.newModel = ModelFactory.createModel(obj.surrogateOpts.modelType, obj.surrogateOpts.modelOpts, obj.cmaesState.xmean', archive);
       if (isempty(obj.newModel))
         [obj, ok] = obj.tryOldModel();
         if (~ok)

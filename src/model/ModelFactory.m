@@ -1,6 +1,6 @@
 classdef ModelFactory
   methods (Static)
-    function obj = createModel(str, modelOptions, xMean)
+    function obj = createModel(str, modelOptions, xMean, archive)
       switch lower(str)
         case 'gp'
           obj = GpModel(modelOptions, xMean);
@@ -10,6 +10,8 @@ classdef ModelFactory
           obj = RfModel(modelOptions, xMean);
         case 'bbob'
           obj = PreciseModel(modelOptions, xMean);
+        case 'modelpool'
+          obj = ModelPool(modelOptions, xMean, archive);
         otherwise
           warning(['ModelFactory.createModel: ' str ' -- no such model available']);
           obj = [];
