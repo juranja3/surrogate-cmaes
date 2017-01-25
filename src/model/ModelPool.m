@@ -21,9 +21,9 @@ classdef ModelPool < Model
         bestModel
         bestModelsHistory
         retrainPeriod
-        lastTrainingGeneration = 0;
         historyLength
         xMean
+        trainLikelihood
     end
     
     methods (Access = public)
@@ -35,6 +35,10 @@ classdef ModelPool < Model
             assert(obj.modelsCount ~= 0, 'ModelPool(): No model provided!');
             obj.models = GpModel.empty;
             obj.bestModelsHistory = zeros(1,obj.modelsCount);
+            obj.dim       = size(xMean, 2);
+            obj.shiftMean = zeros(1, obj.dim);
+            obj.shiftY    = 0;
+            
             %create the models
             for i=1:obj.modelsCount
                 options = modelOptions.parameterSets(i);
@@ -48,46 +52,39 @@ classdef ModelPool < Model
         end
         
         function nData = getNTrainData(obj)
-            nData = 0;
-            %Training of models is handled inside this class, so this
-            %method is no longer required
+            nData=0;
+            for i=1:obj.modelsCount
+                nData = max(nData,obj.models(i,1).getNTrainData());
+            end
         end
         
         function obj = trainModel(obj, X, y, xMean, generation)
-            
-            obj.trainMean = xMean;
-            obj.dataset.X = X;
-            obj.dataset.y = y;
-            obj.trainGeneration = generation;
-            
-            %nechat poslat data z archivu
-            %natrenovat
-            for i=1:obj.modelsCount
-                obj.models(i) = obj.models(i).trainModel(X, y, xMean, generation);
-            end
-            %ulozit do modelpoolu
-            obj.chooseBestModel();
-        end
-        
-        function obj = train(obj, ~, ~, stateVariables, sampleOpts)
-            if (size(obj.archive.gens,1)==0)
-                warning('ModelPool.train(): Empty set retrieved form archive.');
-            else
+            if (mod(generation,obj.retrainPeriod)==0)
+                generations=obj.trainGeneration+1:generation;
+                [X2,y2]=obj.archive.getDataFromGenerations(generations);
+                obj.trainMean = xMean;
+                obj.dataset.X = X;
+                obj.dataset.y = y;
                 for i=1:obj.modelsCount
-                    generations=obj.lastTrainingGeneration+1:obj.archive.gens(end);
-                    trainSet = obj.archive.getDataFromGenerations(generations);
-                    if (size(trainSet,2)==0)
+                    nTrainData = obj.models(i,1).getNTrainData();
+                    if (nTrainData>size(X,1))
+                        warning('ModelPool.trainModel(): not enough data for model no. %d.',i);
+                    else
+                        %TODO:choose the data
+                        modelXData = X(1:nTrainData,:);
+                        modelYData = y(1:nTrainData,:);
                         
+                        circshift(obj.models(i),1,1);
+                        if (size(obj.models(i))<obj.historyLength)
+                            obj.models(i,end+1) = obj.models(i,1);
+                        end
+                        obj.models(i,1) = obj.models(i,2)...
+                            .trainModel(modelXData, modelYData, xMean, generation);
                     end
-                    circshift(obj.models(i),1,1);
-                    if (size(obj.models(i))<obj.historyLength)
-                        obj.models(i,end+1) = obj.models(i,1);
-                    end
-                    obj.models(i,1) = obj.models(i,2)...
-                        .train(trainSet, stateVariables, sampleOpts);
                 end
-                obj.bestModel = chooseBestModel();
-                obj.lastTrainingGeneration = obj.archive.gens(end);
+                
+                obj.trainGeneration = generation;
+                obj.bestModel = obj.chooseBestModel();
             end
         end
         
