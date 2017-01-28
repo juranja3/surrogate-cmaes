@@ -54,6 +54,7 @@ classdef ModelPool < Model
             %create the models
             for i=1:obj.modelsCount
                 options = modelOptions.parameterSets(i);
+                options.bbob_func = modelOptions.bbob_func;
                 obj.models(end+1) = ModelFactory.createModel('gp',options,xMean);
             end
             obj.historyLength = modelOptions.historyLength;
@@ -68,30 +69,25 @@ classdef ModelPool < Model
             obj.transformCoordinates = defopts(modelOptions, 'transformCoordinates', true);
             obj.dimReduction = defopts(modelOptions, 'dimReduction', 1);
             
-            obj = obj.copyVariablesFromBestModel();
         end
         
         function nData = getNTrainData(obj)
-            nData=0;
-            for i=1:obj.modelsCount
-                nData = max(nData,obj.models(i,1).getNTrainData());
+            nData=obj.models(1,1).getNTrainData();
+            for i=2:obj.modelsCount
+                nData = min(nData,obj.models(i,1).getNTrainData());
             end
         end
         
         function obj = trainModel(obj, X, y, xMean, generation)
             
             if (mod(generation,obj.retrainPeriod)==0)
-                generations=obj.trainGeneration+1:generation;
-                [X2,y2]=obj.archive.getDataFromGenerations(generations);
-                
+                trainedModelsCount=0;
                 for i=1:obj.modelsCount
+                    generations=obj.models(i,1).trainGeneration+1:generation;
+                    %[X,y]=obj.archive.getDataFromGenerations(generations);
                     nTrainData = obj.models(i,1).getNTrainData();
-                    %Todo: rework, only 1 model needs to be trained,
-                    %models that were not trained in previous trainModel
-                    %calls should be trained in next call with more data
-                    if (nTrainData>size(X,1))
-                        warning('ModelPool.trainModel(): not enough data for model no. %d.',i);
-                    else
+                    
+                    if (nTrainData<=size(X,1))
                         %TODO:choose the data
                         %modelXData = X(1:nTrainData,:);
                         %modelYData = y(1:nTrainData,:);
@@ -103,15 +99,32 @@ classdef ModelPool < Model
                         end
                         obj.models(i,1) = obj.models(i,2)...
                             .trainModel(modelXData, modelYData, xMean, generation);
+                        trainedModelsCount=trainedModelsCount+1;
                     end
                 end
                 
                 obj.trainGeneration = generation;
                 obj.bestModel = obj.chooseBestModel();
-                obj = obj.copyVariablesFromBestModel();
+                
+                obj.stdY = obj.models(obj.bestModel,1).stdY;
+                obj.options = obj.models(obj.bestModel,1).options;
+                obj.hyp = obj.models(obj.bestModel,1).hyp;
+                obj.meanFcn = obj.models(obj.bestModel,1).meanFcn;
+                obj.covFcn = obj.models(obj.bestModel,1).covFcn;
+                obj.likFcn = obj.models(obj.bestModel,1).likFcn;
+                obj.infFcn = obj.models(obj.bestModel,1).infFcn;
+                obj.nErrors = obj.models(obj.bestModel,1).nErrors;
+                obj.trainLikelihood = obj.models(obj.bestModel,1).trainLikelihood;
+                
+                obj.shiftY = obj.models(obj.bestModel,1).shiftY;
+                obj.trainMean = obj.models(obj.bestModel,1).trainMean;
+                
                 obj.dataset.X = obj.models(obj.bestModel,1).dataset.X;
                 obj.dataset.y = obj.models(obj.bestModel,1).dataset.y;
                 
+                %if (trainedModelsCount==0)
+                %    warning('ModelPool.trainModel(): trainedModelsCount == 0');
+                %end
             end
         end
         
@@ -132,23 +145,6 @@ classdef ModelPool < Model
                 end
             end
             obj.bestModelsHistory(bestModelIndex) = obj.bestModelsHistory(bestModelIndex)+1;
-        end
-        
-        %used to simulate the behavior of the best GpModel
-        function obj = copyVariablesFromBestModel(obj)
-
-            obj.stdY = obj.models(obj.bestModel,1).stdY;
-            obj.options = obj.models(obj.bestModel,1).options;
-            obj.hyp = obj.models(obj.bestModel,1).hyp;
-            obj.meanFcn = obj.models(obj.bestModel,1).meanFcn;
-            obj.covFcn = obj.models(obj.bestModel,1).covFcn;
-            obj.likFcn = obj.models(obj.bestModel,1).likFcn;
-            obj.infFcn = obj.models(obj.bestModel,1).infFcn;
-            obj.nErrors = obj.models(obj.bestModel,1).nErrors;
-            obj.trainLikelihood = obj.models(obj.bestModel,1).trainLikelihood;
-            
-            obj.shiftY = obj.models(obj.bestModel,1).shiftY;
-            obj.trainMean = obj.models(obj.bestModel,1).trainMean;
         end
     end
     
