@@ -33,11 +33,11 @@ classdef ModelPool < Model
         modelsCount
         bestModel
         bestModelsHistory
+        choosingCriterium
         retrainPeriod
         historyLength
+        trainRanges
         xMean
-        mse
-        rde
     end
     
     methods (Access = public)
@@ -47,18 +47,20 @@ classdef ModelPool < Model
             obj.archive = archive;
             obj.modelsCount = size(modelOptions.parameterSets,2);
             assert(obj.modelsCount ~= 0, 'ModelPool(): No model provided!');
-            obj.models = GpModel.empty;
+            obj.historyLength = modelOptions.historyLength;
+            obj.models = cell(obj.modelsCount,obj.historyLength);
             obj.bestModelsHistory = zeros(1,obj.modelsCount);
             obj.dim       = size(xMean, 2);
             obj.shiftMean = zeros(1, obj.dim);
             obj.shiftY    = 0;
             obj.stdY  = 1;
+            obj.trainRanges = zeros(1, obj.modelsCount);
             %create the models
             for i=1:obj.modelsCount
                 options = modelOptions.parameterSets(i);
-                obj.models(end+1) = ModelFactory.createModel('gp',options,xMean);
+                obj.models{i,1} = ModelFactory.createModel('gp',options,xMean);
+                obj.trainRanges(i) = ModelPool.calculateTrainRange(options.trainRange, obj.dim);
             end
-            obj.historyLength = modelOptions.historyLength;
             obj.retrainPeriod = modelOptions.retrainPeriod;
             obj.predictionType = modelOptions.predictionType;
             obj.bestModel=1;
@@ -73,76 +75,79 @@ classdef ModelPool < Model
         end
         
         function nData = getNTrainData(obj)
-            nData=obj.models(1,1).getNTrainData();
+            nData=obj.models{1,1}.getNTrainData();
             for i=2:obj.modelsCount
-                nData = min(nData,obj.models(i,1).getNTrainData());
+                nData = min(nData,obj.models{i,1}.getNTrainData());
             end
         end
         
-        function obj = trainModel(obj, X, y, xMean, generation)
+        function obj = trainModel(obj, paramX, paramY, xMean, generation)
             
             if (mod(generation,obj.retrainPeriod)==0)
                 trainedModelsCount=0;
                 for i=1:obj.modelsCount
-                    generations=obj.models(i,1).trainGeneration+1:generation;
-                    %[X,y]=obj.archive.getDataFromGenerations(generations);
-                    
-                    %if obj.transformCoordinates
-                    % compute coordinates in the (sigma*BD)-basis
-                    %obj.trainSigma = sigma;
-                    %obj.trainBD = BD;
-                    %XTransf =( (sigma * BD) \ X')';
-                    %else
-                    %XTransf = X;
-                    %end
-                    nTrainData = obj.models(i,1).getNTrainData();
-                    
-                    if (nTrainData<=size(X,1))
-                        %TODO:choose the data
-                        %modelXData = X(1:nTrainData,:);
-                        %modelYData = y(1:nTrainData,:);
-                        modelXData = X;
-                        modelYData = y;
-                        circshift(obj.models(i),1,1);
-                        if (size(obj.models(i))<obj.historyLength)
-                            obj.models(i,end+1) = obj.models(i,1);
+                    if strcmpi(obj.modelPoolOptions.parameterSets(i).trainsetType,'parameters')
+                        X = paramX;
+                        y = paramY;
+                    else
+                        switch lower(obj.modelPoolOptions.parameterSets(i).trainsetType)
+                            case 'allpoints'
+                                generations=1:generation;
+                                [X,y]=obj.archive.getDataFromGenerations(generations);
+                            case 'clustering'
+                                
+                            case 'nearest'
+                                
+                            case 'nearesttopopulation'
                         end
-                        obj.models(i,1) = ModelFactory.createModel('gp',obj.modelPoolOptions.parameterSets(i),xMean);
-                        obj.models(i,1) = obj.models(i,1).trainModel(modelXData, modelYData, xMean, generation);
                         
-                        %                         if (obj.isTrained())
-                        %                             % Test that we don't have a constant model
-                        %                             [~, xTestValid] = sampleCmaesNoFitness(sigma, lambda, stateVariables, sampleOpts);
-                        %                             yPredict = obj.models(i,1).predict(xTestValid');
-                        %                             if (max(yPredict) - min(yPredict) < MIN_RESPONSE_DIFFERENCE)
-                        %                                 fprintf('Model.train(): model output is constant (diff=%e), considering the model as un-trained.\n', max(yPredict) - min(yPredict));
-                        %                                 obj.models(i,1).trainGeneration = -1;
-                        %                             end
-                        %                     else
-                        %                         trainedModelsCount=trainedModelsCount+1;
-                        %                         end
+                        if obj.transformCoordinates
+                            %XTransf =( (obj.trainSigma * obj.trainBD) \ X')';
+                        else
+                            %XTransf = X;
+                        end
+                    end
+                    
+                    nTrainData = obj.models{i,1}.getNTrainData();
+                    
+                    if (nTrainData < size(X,1))
                         
+                        newModel = ModelFactory.createModel('gp',obj.modelPoolOptions.parameterSets(i),xMean);
+                        newModel = newModel.trainModel(X, y, xMean, generation);
+                        if (newModel.isTrained())
+                            % Test that we don't have a constant model
+                            %[~, xTestValid] = sampleCmaesNoFitness(sigma, lambda, stateVariables, sampleOpts);
+                            %yPredict = newModel.predict(xTestValid');
+                            %if (max(yPredict) - min(yPredict) < MIN_RESPONSE_DIFFERENCE)
+                            %    obj.models{i,1).trainGeneration = -1;
+                            if (false)
+                                
+                            else
+                                trainedModelsCount=trainedModelsCount+1;
+                                obj.models(i,:) = circshift(obj.models(i,:),[1,1]);
+                                obj.models{i,1} = newModel;
+                            end
+                        end
                     end
                 end
                 
                 obj.trainGeneration = generation;
-                obj.bestModel = obj.chooseBestModel();
+                [obj.bestModel,obj.choosingCriterium] = obj.chooseBestModel();
                 
-                obj.stdY = obj.models(obj.bestModel,1).stdY;
-                obj.options = obj.models(obj.bestModel,1).options;
-                obj.hyp = obj.models(obj.bestModel,1).hyp;
-                obj.meanFcn = obj.models(obj.bestModel,1).meanFcn;
-                obj.covFcn = obj.models(obj.bestModel,1).covFcn;
-                obj.likFcn = obj.models(obj.bestModel,1).likFcn;
-                obj.infFcn = obj.models(obj.bestModel,1).infFcn;
-                obj.nErrors = obj.models(obj.bestModel,1).nErrors;
-                obj.trainLikelihood = obj.models(obj.bestModel,1).trainLikelihood;
+                obj.stdY = obj.models{obj.bestModel,1}.stdY;
+                obj.options = obj.models{obj.bestModel,1}.options;
+                obj.hyp = obj.models{obj.bestModel,1}.hyp;
+                obj.meanFcn = obj.models{obj.bestModel,1}.meanFcn;
+                obj.covFcn = obj.models{obj.bestModel,1}.covFcn;
+                obj.likFcn = obj.models{obj.bestModel,1}.likFcn;
+                obj.infFcn = obj.models{obj.bestModel,1}.infFcn;
+                obj.nErrors = obj.models{obj.bestModel,1}.nErrors;
+                obj.trainLikelihood = obj.models{obj.bestModel,1}.trainLikelihood;
                 
-                obj.shiftY = obj.models(obj.bestModel,1).shiftY;
-                obj.trainMean = obj.models(obj.bestModel,1).trainMean;
+                obj.shiftY = obj.models{obj.bestModel,1}.shiftY;
+                obj.trainMean = obj.models{obj.bestModel,1}.trainMean;
                 
-                obj.dataset.X = obj.models(obj.bestModel,1).dataset.X;
-                obj.dataset.y = obj.models(obj.bestModel,1).dataset.y;
+                obj.dataset = obj.models{obj.bestModel,1}.dataset;
                 
                 %if (trainedModelsCount==0)
                 %    warning('ModelPool.trainModel(): trainedModelsCount == 0');
@@ -151,60 +156,65 @@ classdef ModelPool < Model
         end
         
         function [y, sd2] = modelPredict(obj, X)
-            [y,sd2] = obj.models(obj.bestModel,1).modelPredict(X);
+            [y,sd2] = obj.models{obj.bestModel,1}.modelPredict(X);
         end
         
     end
     
     methods (Access = public)
-        function bestModelIndex = chooseBestModel(obj)
+        function [bestModelIndex, choosingCriterium] = chooseBestModel(obj)
             lastGeneration = max(obj.archive.gens);
+            choosingCriterium = Inf(obj.modelsCount,1);
+            if (isempty(lastGeneration))
+                lastGeneration = 0;
+            end
             switch lower(obj.modelPoolOptions.bestModelSelection)
                 case 'likelihood'
-                    likelihood = inf;
                     for i=1:obj.modelsCount
-                        if (obj.models(i,1).trainLikelihood < likelihood)
-                            likelihood = obj.models(i,1).trainLikelihood;
-                            bestModelIndex = i;
-                        end
+                        choosingCriterium(i) = obj.models{i,1}.trainLikelihood;
                     end
-                    
                 case 'rdeorig'
-                    obj.rde = Inf(obj.modelsCount,1);
                     for i=1:obj.modelsCount
-                        generations = obj.models(i,1).trainGeneration+1:lastGeneration;
+                        generations = obj.models{i,1}.trainGeneration+1:lastGeneration;
                         [X,yArchive] = obj.archive.getDataFromGenerations(generations);
                         if (size(X,1)~=0)
-                            [yModel, ~] = obj.models(i,end).modelPredict(X);
-                            %end because we test the oldest models
-                            obj.rde(i) = errRankMu(yModel,yArchive,size(yArchive,1));
+                            nonEmptyCount = sum(~cellfun('isempty',obj.models(i,:)));
+                            %because we test the oldest models
+                            [yModel, ~] = obj.models{i,nonEmptyCount}.modelPredict(X);
+                            if (size(yArchive)==size(yModel))
+                                choosingCriterium(i) = errRankMu(yModel,yArchive,size(yArchive,1));
+                            end
                         end
                     end
-                    [~,bestModelIndex] = min(obj.rde);
                 case 'rdeall'
                     %sample more point
                     %create 2 vectors - 1 with models predictions and 1
                     %with orig + model predictions
                     %compute rde
-                    bestModelIndex = 1;
                 case 'mse'
-                    obj.mse = Inf(obj.modelsCount,1);
                     for i=1:obj.modelsCount
-                        generations=obj.models(i,1).trainGeneration+1:lastGeneration;
+                        generations=obj.models{i,1}.trainGeneration+1:lastGeneration;
                         [X,yArchive] = obj.archive.getDataFromGenerations(generations);
                         if (size(X,1)~=0)
-                            [yModel, ~] = obj.models(i,end).modelPredict(X);
-                            %end because we test the oldest models
-                            obj.mse(i) = immse(yArchive,yModel);
+                            nonEmptyCount = sum(~cellfun('isempty',obj.models(i,:)));
+                            %because we test the oldest models
+                            [yModel, ~] = obj.models{i,nonEmptyCount}.modelPredict(X);
+                            if (size(yArchive)==size(yModel))
+                                choosingCriterium(i) = immse(yArchive,yModel);
+                            end
                         end
                     end
-                    [~,bestModelIndex] = min(obj.mse);
                 otherwise
-                        error(['ModelPool.chooseBestModel: ' obj.modelPoolOptions.bestModelSelection ' -- no such option available']);
+                    error(['ModelPool.chooseBestModel: ' obj.modelPoolOptions.bestModelSelection ' -- no such option available']);
             end
+            [~,bestModelIndex] = min(choosingCriterium);
             obj.bestModelsHistory(bestModelIndex) = obj.bestModelsHistory(bestModelIndex)+1;
         end
     end
     
-    
+    methods (Static)
+        function result = calculateTrainRange(percentile, dimension)
+            result = chi2inv(percentile,dimension);
+        end
+    end
 end
