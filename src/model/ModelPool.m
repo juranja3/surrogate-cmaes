@@ -56,11 +56,11 @@ classdef ModelPool < Model
             obj.stdY  = 1;
             obj.trainRanges = zeros(1, obj.modelsCount);
             %create the models
-            for i=1:obj.modelsCount
-                options = modelOptions.parameterSets(i);
-                obj.models{i,1} = ModelFactory.createModel('gp',options,xMean);
-                obj.trainRanges(i) = ModelPool.calculateTrainRange(options.trainRange, obj.dim);
-            end
+            %for i=1:obj.modelsCount
+            %    options = modelOptions.parameterSets(i);
+            %    obj.models{i,1} = ModelFactory.createModel('gp',options,xMean);
+            %    obj.trainRanges(i) = ModelPool.calculateTrainRange(options.trainRange, obj.dim);
+            %end
             obj.retrainPeriod = modelOptions.retrainPeriod;
             obj.predictionType = modelOptions.predictionType;
             obj.bestModel=1;
@@ -75,10 +75,7 @@ classdef ModelPool < Model
         end
         
         function nData = getNTrainData(obj)
-            nData=obj.models{1,1}.getNTrainData();
-            for i=2:obj.modelsCount
-                nData = min(nData,obj.models{i,1}.getNTrainData());
-            end
+            nData = 1;
         end
         
         function obj = trainModel(obj, paramX, paramY, xMean, generation)
@@ -101,18 +98,24 @@ classdef ModelPool < Model
                             case 'nearesttopopulation'
                         end
                         
-                        if obj.transformCoordinates
-                            %XTransf =( (obj.trainSigma * obj.trainBD) \ X')';
-                        else
-                            %XTransf = X;
+                        
+                        if obj.transformCoordinates && size(X,1)>0
+                            X = ( (obj.trainSigma * obj.trainBD) \ X')';
+                        end
+                        
+                        trainsetSizeMax = obj.modelPoolOptions.parameterSets(i).trainsetSizeMax;
+                        if size(X,1)> trainsetSizeMax
+                           X = X(end-trainsetSizeMax+1:end,:); 
+                           y = y(end-trainsetSizeMax+1:end,:);
+                           %remove elements from the beginning
                         end
                     end
                     
-                    nTrainData = obj.models{i,1}.getNTrainData();
+                    newModel = ModelFactory.createModel('gp',obj.modelPoolOptions.parameterSets(i),xMean);
+                    nTrainData = newModel.getNTrainData();
                     
-                    if (nTrainData < size(X,1))
+                    if (nTrainData <= size(X,1))
                         
-                        newModel = ModelFactory.createModel('gp',obj.modelPoolOptions.parameterSets(i),xMean);
                         newModel = newModel.trainModel(X, y, xMean, generation);
                         if (newModel.isTrained())
                             % Test that we don't have a constant model
@@ -131,27 +134,28 @@ classdef ModelPool < Model
                     end
                 end
                 
-                obj.trainGeneration = generation;
-                [obj.bestModel,obj.choosingCriterium] = obj.chooseBestModel();
-                
-                obj.stdY = obj.models{obj.bestModel,1}.stdY;
-                obj.options = obj.models{obj.bestModel,1}.options;
-                obj.hyp = obj.models{obj.bestModel,1}.hyp;
-                obj.meanFcn = obj.models{obj.bestModel,1}.meanFcn;
-                obj.covFcn = obj.models{obj.bestModel,1}.covFcn;
-                obj.likFcn = obj.models{obj.bestModel,1}.likFcn;
-                obj.infFcn = obj.models{obj.bestModel,1}.infFcn;
-                obj.nErrors = obj.models{obj.bestModel,1}.nErrors;
-                obj.trainLikelihood = obj.models{obj.bestModel,1}.trainLikelihood;
-                
-                obj.shiftY = obj.models{obj.bestModel,1}.shiftY;
-                obj.trainMean = obj.models{obj.bestModel,1}.trainMean;
-                
-                obj.dataset = obj.models{obj.bestModel,1}.dataset;
-                
-                %if (trainedModelsCount==0)
-                %    warning('ModelPool.trainModel(): trainedModelsCount == 0');
-                %end
+                if (trainedModelsCount==0)
+                    warning('ModelPool.trainModel(): trainedModelsCount == 0');
+                else
+                    obj.trainGeneration = generation;
+                    
+                    [obj.bestModel,obj.choosingCriterium] = obj.chooseBestModel();
+                    
+                    obj.stdY = obj.models{obj.bestModel,1}.stdY;
+                    obj.options = obj.models{obj.bestModel,1}.options;
+                    obj.hyp = obj.models{obj.bestModel,1}.hyp;
+                    obj.meanFcn = obj.models{obj.bestModel,1}.meanFcn;
+                    obj.covFcn = obj.models{obj.bestModel,1}.covFcn;
+                    obj.likFcn = obj.models{obj.bestModel,1}.likFcn;
+                    obj.infFcn = obj.models{obj.bestModel,1}.infFcn;
+                    obj.nErrors = obj.models{obj.bestModel,1}.nErrors;
+                    obj.trainLikelihood = obj.models{obj.bestModel,1}.trainLikelihood;
+                    
+                    obj.shiftY = obj.models{obj.bestModel,1}.shiftY;
+                    obj.trainMean = obj.models{obj.bestModel,1}.trainMean;
+                    
+                    obj.dataset = obj.models{obj.bestModel,1}.dataset;
+                end
             end
         end
         
