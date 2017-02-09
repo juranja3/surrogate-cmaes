@@ -45,9 +45,10 @@ classdef ModelPool < Model
             obj.modelPoolOptions = modelOptions;
             obj.xMean = xMean;
             obj.archive = archive;
-            obj.modelsCount = size(modelOptions.parameterSets,2);
+            obj.modelsCount = length(modelOptions.parameterSets);
             assert(obj.modelsCount ~= 0, 'ModelPool(): No model provided!');
             obj.historyLength = modelOptions.historyLength;
+            obj.retrainPeriod = modelOptions.retrainPeriod;
             obj.models = cell(obj.modelsCount,obj.historyLength);
             obj.bestModelsHistory = zeros(1,obj.modelsCount);
             obj.dim       = size(xMean, 2);
@@ -55,22 +56,21 @@ classdef ModelPool < Model
             obj.shiftY    = 0;
             obj.stdY  = 1;
             obj.trainRanges = zeros(1, obj.modelsCount);
-            %create the models
-            %for i=1:obj.modelsCount
-            %    options = modelOptions.parameterSets(i);
-            %    obj.models{i,1} = ModelFactory.createModel('gp',options,xMean);
-            %    obj.trainRanges(i) = ModelPool.calculateTrainRange(options.trainRange, obj.dim);
-            %end
-            obj.retrainPeriod = modelOptions.retrainPeriod;
-            obj.predictionType = modelOptions.predictionType;
-            obj.bestModel=1;
-            
-            obj.options.normalizeY = defopts(modelOptions, 'normalizeY', true);
             
             % general model prediction options
             obj.predictionType = defopts(modelOptions, 'predictionType', 'fValues');
             obj.transformCoordinates = defopts(modelOptions, 'transformCoordinates', true);
             obj.dimReduction = defopts(modelOptions, 'dimReduction', 1);
+            obj.options.normalizeY = defopts(modelOptions, 'normalizeY', true);
+            
+            for i=1:obj.modelsCount
+                options = modelOptions.parameterSets(i);
+                %create the models
+                %obj.models{i,1} = ModelFactory.createModel('gp',options,xMean); not created because it would be useless without training
+                
+                %calculate train ranges
+                obj.trainRanges(i) = ModelPool.calculateTrainRange(options.trainRange, obj.dim);
+            end
             
         end
         
@@ -99,9 +99,9 @@ classdef ModelPool < Model
                         end
                         
                         
-                        if obj.transformCoordinates && size(X,1)>0
-                            X = ( (obj.trainSigma * obj.trainBD) \ X')';
-                        end
+                        %if obj.transformCoordinates && size(X,1)>0
+                        %    X = ( (obj.trainSigma * obj.trainBD) \ X')';
+                        %end
                         
                         trainsetSizeMax = obj.modelPoolOptions.parameterSets(i).trainsetSizeMax;
                         if size(X,1)> trainsetSizeMax
@@ -127,7 +127,7 @@ classdef ModelPool < Model
                                 
                             else
                                 trainedModelsCount=trainedModelsCount+1;
-                                obj.models(i,:) = circshift(obj.models(i,:),[1,1]);
+                                obj.models(i,:) = circshift(obj.models(i,:),[0,1]);
                                 obj.models{i,1} = newModel;
                             end
                         end
@@ -182,11 +182,12 @@ classdef ModelPool < Model
                         generations = obj.models{i,1}.trainGeneration+1:lastGeneration;
                         [X,yArchive] = obj.archive.getDataFromGenerations(generations);
                         if (size(X,1)~=0)
-                            nonEmptyCount = sum(~cellfun('isempty',obj.models(i,:)));
-                            %because we test the oldest models
-                            [yModel, ~] = obj.models{i,nonEmptyCount}.modelPredict(X);
-                            if (size(yArchive)==size(yModel))
-                                choosingCriterium(i) = errRankMu(yModel,yArchive,size(yArchive,1));
+                            if (~isempty(obj.models{i,obj.historyLength}))
+                                %because we test the oldest models
+                                [yModel, ~] = obj.models{i,obj.historyLength}.modelPredict(X);
+                                if (size(yArchive)==size(yModel))
+                                    choosingCriterium(i) = errRankMu(yModel,yArchive,size(yArchive,1));
+                                end
                             end
                         end
                     end
@@ -200,11 +201,12 @@ classdef ModelPool < Model
                         generations=obj.models{i,1}.trainGeneration+1:lastGeneration;
                         [X,yArchive] = obj.archive.getDataFromGenerations(generations);
                         if (size(X,1)~=0)
-                            nonEmptyCount = sum(~cellfun('isempty',obj.models(i,:)));
-                            %because we test the oldest models
-                            [yModel, ~] = obj.models{i,nonEmptyCount}.modelPredict(X);
-                            if (size(yArchive)==size(yModel))
-                                choosingCriterium(i) = immse(yArchive,yModel);
+                            if (~isempty(obj.models{i,obj.historyLength}))
+                                %because we test the oldest models
+                                [yModel, ~] = obj.models{i,obj.historyLength}.modelPredict(X);
+                                if (size(yArchive)==size(yModel))
+                                    choosingCriterium(i) = immse(yArchive,yModel);
+                                end
                             end
                         end
                     end
