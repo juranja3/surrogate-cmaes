@@ -45,6 +45,16 @@ classdef DTScreenStatistics < Observer
       fprintf('=[DTS]= %4d /%5d(%2d:%1d,%1d) | %.1e | %.1e | %.2f | %.2f | %.2f %s | %s %2d/%3d | %.2e |\n', ... %  %.2f | %.2f | %.2f | %.2f |\n', ...
           outputValues1(:), decorateKendall(1-2*ec.stats.rankErrValid), model, outputValues2(:) ...
           );
+      
+      if isa(ec.model, 'ModelPool')
+          if (mod(ec.cmaesState.countiter, 10) == 0)
+              fprintf('Best Models History:');
+              for i=1:ec.model.modelsCount
+                fprintf(' %d ',ec.model.bestModelsHistory(i));
+              end
+              fprintf('\n');
+          end
+      end
     end
   end
 end
