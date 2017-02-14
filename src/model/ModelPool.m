@@ -223,7 +223,7 @@ classdef ModelPool < Model
                     case 'rdeorig'
                         choosingCriterium = obj.getRdeOrig(lastGeneration);
                     case 'rdeall'
-                        choosingCriterium = obj.getRdeAll(lastGeneration);
+                        choosingCriterium = obj.getRdeAll();
                     case 'mse'
                         choosingCriterium = obj.getMse(lastGeneration);
                     otherwise
@@ -273,9 +273,26 @@ classdef ModelPool < Model
             end
         end
         
-        function choosingCriterium = getRdeAll(obj, lastGeneration)
+        function choosingCriterium = getRdeAll(obj)
             choosingCriterium = Inf(obj.modelsCount,1);
-            
+            for i=1:obj.modelsCount
+                model = obj.models{i,obj.historyLength+1};
+                if ~isempty(model)
+                    [~, xSample] = sampleCmaesNoFitness(...
+                        model.trainSigma, ...
+                        model.stateVariables.lambda, ...
+                        model.stateVariables, ...
+                        model.sampleOpts);
+                    % get points from archive 
+                    [origPoints_X, origPoints_y] = obj.archive.getDataFromGenerations(model.trainGeneration+1);
+                    xSample(1:size(origPoints_X,1)) = origPoints_X(1:size(origPointsX,1));
+                    ySample = model.predict(xSample');
+                    yWithOrig = ySample;
+                    % replace predicted values with original values
+                    yWithOrig(1:size(origPoints_y,1)) = origPoints_y;
+                    choosingCriterium(i) = errRankMu(ySample,yWithOrig,size(yWithOrig,1));
+                end
+            end
         end
         
         function choosingCriterium = getMse(obj, lastGeneration)
