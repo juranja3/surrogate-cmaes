@@ -107,7 +107,6 @@ classdef ModelPool < Model
         end
         
         function obj = trainModel(obj, paramX, paramY, xMean, generation)
-            persistent persistantBestModelsHistory;     % used because evolution strategy always creates a new modelpool
             
             if (mod(generation,obj.retrainPeriod)==0)
                 
@@ -168,7 +167,7 @@ classdef ModelPool < Model
                         if (max(yPredict) - min(yPredict) < MIN_RESPONSE_DIFFERENCE)
                             obj.models{i,1}.trainGeneration = -1;
                         else
-                            trainedModelsCount=trainedModelsCount+1;
+                            trainedModelsCount = trainedModelsCount+1;
                             obj.isModelTrained(i,1) = 1;
                         end
                     end
@@ -182,12 +181,6 @@ classdef ModelPool < Model
                     [obj.bestModelIndex,obj.choosingCriterium] = obj.chooseBestModel(generation);
                     obj.bestModelsHistory(obj.bestModelIndex) = obj.bestModelsHistory(obj.bestModelIndex)+1;
                     obj = obj.copyPropertiesFromBestModel();
-                    
-                    if (isempty(persistantBestModelsHistory))
-                        persistantBestModelsHistory = zeros(obj.modelsCount,1);
-                    end
-                    persistantBestModelsHistory(obj.bestModelIndex) = persistantBestModelsHistory(obj.bestModelIndex)+1;
-                    obj.bestModelsHistory = persistantBestModelsHistory;
                 end
             end
         end
@@ -259,12 +252,12 @@ classdef ModelPool < Model
         function choosingCriterium = getRdeOrig(obj, lastGeneration)
             choosingCriterium = Inf(obj.modelsCount,1);
             for i=1:obj.modelsCount
-                generations = obj.models{i,1}.trainGeneration+1:lastGeneration;
+                generations = obj.models{i,end}.trainGeneration+1:lastGeneration;
                 [X,yArchive] = obj.archive.getDataFromGenerations(generations);
                 if (size(X,1)~=0)
-                    if (~isempty(obj.models{i,obj.historyLength+1}))
+                    if (~isempty(obj.models{i,end}))
                         %because we test the oldest models
-                        [yModel, ~] = obj.models{i,obj.historyLength+1}.modelPredict(X);
+                        [yModel, ~] = obj.models{i,end}.modelPredict(X);
                         if (size(yArchive)==size(yModel))
                             choosingCriterium(i) = errRankMu(yModel,yArchive,size(yArchive,1));
                         end
@@ -285,7 +278,7 @@ classdef ModelPool < Model
                         model.sampleOpts);
                     % get points from archive 
                     [origPoints_X, origPoints_y] = obj.archive.getDataFromGenerations(model.trainGeneration+1);
-                    xSample(1:size(origPoints_X,1)) = origPoints_X(1:size(origPointsX,1));
+                    xSample(1:size(origPoints_X,1)) = origPoints_X(1:size(origPoints_X,1));
                     ySample = model.predict(xSample');
                     yWithOrig = ySample;
                     % replace predicted values with original values
@@ -298,12 +291,12 @@ classdef ModelPool < Model
         function choosingCriterium = getMse(obj, lastGeneration)
             choosingCriterium = Inf(obj.modelsCount,1);
             for i=1:obj.modelsCount
-                generations=obj.models{i,1}.trainGeneration+1:lastGeneration;
+                generations=obj.models{i,end}.trainGeneration+1:lastGeneration;
                 [X,yArchive] = obj.archive.getDataFromGenerations(generations);
                 if (size(X,1)~=0)
-                    if (~isempty(obj.models{i,obj.historyLength+1}))
+                    if (~isempty(obj.models{i,end}))
                         %because we test the oldest models
-                        [yModel, ~] = obj.models{i,obj.historyLength+1}.modelPredict(X);
+                        [yModel, ~] = obj.models{i,end}.modelPredict(X);
                         if (size(yArchive)==size(yModel))
                             choosingCriterium(i) = immse(yArchive,yModel);
                         end
