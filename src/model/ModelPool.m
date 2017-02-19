@@ -25,8 +25,13 @@ classdef ModelPool < Model
         nErrors
         trainLikelihood
         
+         % Dimensionality-reduction specific fields
+        dimReduction          % Reduce dimensionality for model by eigenvectors
+                              % of covatiance matrix in percentage
+        reductionMatrix       % Matrix used for dimensionality reduction
+        
         % ModelPool specific properties
-        dimReduction
+
         modelPoolOptions
         archive
         modelsCount           % number of models in the modelPool
@@ -37,7 +42,6 @@ classdef ModelPool < Model
         bestModelsHistory     % how many times has been each model chosen as the best one
         choosingCriterium     % mse/rde/likelihood/...
         retrainPeriod
-        trainRanges
         nTrainData            % min of getNTrainData of all created models
         xMean
         switchToLikelihoodPercentile    % if percentile of oldest models that are trained
@@ -62,7 +66,6 @@ classdef ModelPool < Model
             obj.shiftMean = zeros(1, obj.dim);
             obj.shiftY    = 0;
             obj.stdY      = 1;
-            obj.trainRanges = zeros(1, obj.modelsCount);
             obj.switchToLikelihoodPercentile = defopts(modelOptions, 'switchToLikelihoodPercentile', 0.25);
             
             % general model prediction options
@@ -75,11 +78,10 @@ classdef ModelPool < Model
             for i=1:obj.modelsCount
                 %create the models, calculate needed properties
                 modelOptions = obj.modelPoolOptions.parameterSets(i);
+                obj.modelPoolOptions.parameterSets(i).calculatedTrainRange = ModelPool.calculateTrainRange(modelOptions.trainRange, obj.dim);
                 obj.models{i,1} = obj.createGpModel(i, xMean);
                 obj.nTrainData = min(obj.models{i,1}.getNTrainData(),obj.nTrainData);
-                obj.trainRanges(i) = ModelPool.calculateTrainRange(modelOptions.trainRange, obj.dim);
             end
-            
         end
         
         function gpModel = createGpModel(obj, modelIndex, xMean)
@@ -106,70 +108,30 @@ classdef ModelPool < Model
             end
         end
         
-        function obj = trainModel(obj, paramX, paramY, xMean, generation)
-            
+        function obj = trainModel(obj, ~, ~, ~, ~)
+            % This function is empty because it is not needed, training is
+            % done in train().
+        end
+        
+        function obj = train(obj, X, y, stateVariables, sampleOpts, ~, population)
+            obj.xMean = stateVariables.xmean';
+            generation = stateVariables.countiter;
             if (mod(generation,obj.retrainPeriod)==0)
                 
                 trainedModelsCount=0;
                 for i=1:obj.modelsCount
-                    modelOptions = obj.modelPoolOptions.parameterSets(i);
-                    trainsetType = defopts(modelOptions, 'trainsetType', 'parameters');
-                    if strcmpi(trainsetType,'parameters')
-                        X = paramX;
-                        y = paramY;
-                    else
-                        %TODO: move to archive
-                        switch lower(trainsetType)
-                            case 'allpoints'
-                                generations=1:generation;
-                                [X,y]=obj.archive.getDataFromGenerations(generations);
-                            case 'clustering'
-                                
-                            case 'nearest'
-                                
-                            case 'nearesttopopulation'
-                        end
-                        
-                        if obj.transformCoordinates && size(X,1)>0
-                            X = ( (obj.trainSigma * obj.trainBD) \ X')';
-                        end
-                        
-                        trainsetSizeMax = modelOptions.trainsetSizeMax;
-                        if size(X,1)> trainsetSizeMax
-                            X = X(end-trainsetSizeMax+1:end,:);
-                            y = y(end-trainsetSizeMax+1:end,:);
-                            %remove elements from the beginning
-                        end
-                        %TODO: move to archive
-                    end
-                    
-                    % minimal difference between minimal and maximal returned
-                    % value to regard the model as trained; otherwise, the
-                    % constant response is mark of a badly trained model
-                    % and therefor it is marked as untrained
-                    MIN_RESPONSE_DIFFERENCE = min(1e-8, 0.05 * (max(y) - min(y)));
                     
                     obj.models(i,:) = circshift(obj.models(i,:),[0,1]);
                     obj.isModelTrained(i,:) = circshift(obj.isModelTrained(i,:),[0,1]);
                     obj.isModelTrained(i,1) = 0;
-                    obj.models{i,1} = obj.createGpModel(i, xMean);
-                    obj.models{i,1} = obj.models{i,1}.trainModel(X, y, xMean, generation);
-                    obj.models{i,1} = obj.copyPropertiesToGpModel(obj.models{i,1});
+                    obj.models{i,1} = obj.createGpModel(i, obj.xMean);
+                    obj.models{i,1} = obj.models{i,1}.train(X, y, stateVariables, sampleOpts, obj.archive, population);
                     
                     if (obj.models{i,1}.isTrained())
-                        % Test that we don't have a constant model
-                        [~, xTestValid] = sampleCmaesNoFitness(...
-                            obj.trainSigma, ...
-                            obj.stateVariables.lambda, ...
-                            obj.stateVariables, ...
-                            obj.sampleOpts);
-                        yPredict = obj.models{i,1}.predict(xTestValid');
-                        if (max(yPredict) - min(yPredict) < MIN_RESPONSE_DIFFERENCE)
-                            obj.models{i,1}.trainGeneration = -1;
-                        else
-                            trainedModelsCount = trainedModelsCount+1;
-                            obj.isModelTrained(i,1) = 1;
-                        end
+                        trainedModelsCount = trainedModelsCount+1;
+                        obj.isModelTrained(i,1) = 1;
+                    else
+                        obj.models{i,1}.trainGeneration = -1;
                     end
                 end
                 
@@ -239,14 +201,13 @@ classdef ModelPool < Model
             obj.trainLikelihood = obj.models{obj.bestModelIndex,1}.trainLikelihood;
             
             obj.shiftY = obj.models{obj.bestModelIndex,1}.shiftY;
+            obj.trainSigma = obj.models{obj.bestModelIndex,1}.trainSigma;
+            obj.trainBD = obj.models{obj.bestModelIndex,1}.trainBD;
             obj.trainMean = obj.models{obj.bestModelIndex,1}.trainMean;
-        end
-        
-        function gpModel = copyPropertiesToGpModel(obj, gpModel)
-            gpModel.stateVariables = obj.stateVariables;
-            gpModel.sampleOpts = obj.sampleOpts;
-            gpModel.trainSigma = obj.trainSigma;
-            gpModel.trainBD = obj.trainBD;
+            obj.shiftMean = obj.models{obj.bestModelIndex,1}.shiftMean;
+            obj.reductionMatrix = obj.models{obj.bestModelIndex,1}.reductionMatrix;
+            obj.stateVariables = obj.models{obj.bestModelIndex,1}.stateVariables;
+            obj.sampleOpts = obj.models{obj.bestModelIndex,1}.sampleOpts;
         end
         
         function choosingCriterium = getRdeOrig(obj, lastGeneration)
@@ -276,7 +237,7 @@ classdef ModelPool < Model
                         model.stateVariables.lambda, ...
                         model.stateVariables, ...
                         model.sampleOpts);
-                    % get points from archive 
+                    % get points from archive
                     [origPoints_X, origPoints_y] = obj.archive.getDataFromGenerations(model.trainGeneration+1);
                     xSample(1:size(origPoints_X,1)) = origPoints_X(1:size(origPoints_X,1));
                     ySample = model.predict(xSample');

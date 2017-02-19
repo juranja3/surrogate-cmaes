@@ -143,7 +143,8 @@ classdef DoubleTrainedEC < EvolutionControl & Observable
         end
 
         % (first) model training
-        obj.newModel = obj.newModel.train(xTrain, yTrain, obj.cmaesState, sampleOpts);
+        % TODO: obj.pop, archive
+        obj.newModel = obj.newModel.train(xTrain, yTrain, obj.cmaesState, sampleOpts, [], obj.pop);
         if (obj.newModel.isTrained())
           obj = obj.updateModelArchive(obj.newModel, obj.modelAge);
         else
@@ -239,7 +240,8 @@ classdef DoubleTrainedEC < EvolutionControl & Observable
           % re-train the model again with the new original-evaluated points
           xTrain = [xTrain; xNewValid'];
           yTrain = [yTrain; yNew'];
-          obj.retrainedModel = obj.model.train(xTrain, yTrain, obj.cmaesState, sampleOpts);
+          % TODO: obj.pop, archive
+          obj.retrainedModel = obj.model.train(xTrain, yTrain, obj.cmaesState, sampleOpts, [], obj.pop);
 
           if (obj.useDoubleTraining && obj.retrainedModel.isTrained())
             obj = obj.updateModelArchive(obj.retrainedModel, obj.modelAge);

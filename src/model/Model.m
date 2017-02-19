@@ -246,15 +246,24 @@ classdef (Abstract) Model
 
     end
     
-    function obj = train(obj, X, y, stateVariables, sampleOpts)
+    function obj = train(obj, X, y, stateVariables, sampleOpts, archive, population)
     % train the model based on the data (X,y)
-    
+    % if archive is passed and trainsetType is not 'parameters',
+    % X and y are ignored and new values for X, y are retrieved from archive 
+    % according to the model settings
+      
       xMean = stateVariables.xmean';
       generation = stateVariables.countiter;
       sigma = stateVariables.sigma;
       lambda = stateVariables.lambda;
       BD = stateVariables.BD;
       obj.sampleOpts = sampleOpts;
+      obj.trainMean = xMean;
+      obj.stateVariables = stateVariables;
+      
+      if (~isempty(archive) && ~strcmpi(obj.options.trainsetType,'parameters') )
+          [X, y] = obj.generateDataset(archive, population);
+      end
 
       % minimal difference between minimal and maximal returned
       % value to regard the model as trained; otherwise, the
@@ -271,8 +280,6 @@ classdef (Abstract) Model
       else
         XTransf = X;
       end
-      obj.trainMean = xMean;
-      obj.stateVariables = stateVariables;
 
       % dimensionality reduction
       if (isprop(obj, 'dimReduction') && (obj.dimReduction ~= 1))
@@ -329,6 +336,16 @@ classdef (Abstract) Model
 
       datasetIdx = allowedIdxs(datasetIdx);
       x = dataset_X(datasetIdx, :);
+    end
+    
+    
+    function [X,y] = generateDataset(obj, archive, population)
+        xMean = obj.stateVariables.xmean';
+        sigma = obj.stateVariables.sigma;
+        BD = obj.stateVariables.BD;
+        [X,y] = archive.getTrainsetData(obj.options.trainsetType,...
+            obj.options.trainsetSizeMax, xMean, obj.options.calculatedTrainRange,...
+            sigma, BD, population);
     end
   end
 end
