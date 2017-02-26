@@ -168,7 +168,7 @@ classdef ModelPool < Model
         lastGeneration = 0;
       end
       
-      trainedPercentile = mean2(obj.isModelTrained(:,end));
+      trainedPercentile = mean(obj.isModelTrained(:,end));
       
       if trainedPercentile < obj.switchToLikelihoodPercentile ...
           || strcmpi(obj.modelPoolOptions.bestModelSelection,'likelihood')
@@ -259,7 +259,7 @@ classdef ModelPool < Model
             %because we test the oldest models
             [yModel, ~] = obj.models{i,end}.modelPredict(X);
             if (size(yArchive)==size(yModel))
-              choosingCriterium(i) = immse(yArchive,yModel);
+              choosingCriterium(i) = sqrt(sum((yModel - yArchive).^2));
             end
           end
         end
