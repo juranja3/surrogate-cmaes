@@ -51,10 +51,9 @@ classdef ModelPool < Model
   end
   
   methods (Access = public)
-    function obj = ModelPool(modelOptions, xMean, archive)
+    function obj = ModelPool(modelOptions, xMean)
       obj.modelPoolOptions = modelOptions;
       obj.xMean = xMean;
-      obj.archive = archive;
       obj.modelsCount = length(modelOptions.parameterSets);
       assert(obj.modelsCount ~= 0, 'ModelPool(): No model provided!');
       obj.historyLength = defopts(modelOptions, 'historyLength', 4);
@@ -113,7 +112,8 @@ classdef ModelPool < Model
       % done in train().
     end
     
-    function obj = train(obj, X, y, stateVariables, sampleOpts, ~, population)
+    function obj = train(obj, X, y, stateVariables, sampleOpts, archive, population)
+      obj.archive = archive;
       obj.xMean = stateVariables.xmean';
       generation = stateVariables.countiter;
       if (mod(generation,obj.retrainPeriod)==0)
