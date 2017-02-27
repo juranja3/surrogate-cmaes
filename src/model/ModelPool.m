@@ -40,14 +40,16 @@ classdef ModelPool < Model
     isModelTrained        % 2D array, 0 if model at this position in models property is trained, 1 otherwise
     bestModelIndex
     bestModelsHistory     % how many times has been each model chosen as the best one
-    choosingCriterium     % mse/rde/likelihood/...
+    bestModelSelection    % which criterium will be used to select which model is the best 
+                          %(mse/mae/rdeAll/rdeOrig/likelihood)
+    choosingCriterium     % values of calculated criterium (mse/mae/...) for each model
     retrainPeriod
     nTrainData            % min of getNTrainData of all created models
     xMean
-    switchToLikelihoodPercentile    % if percentile of oldest models that are trained
-    % drops below this value, we use the likelihood of newest models
-    % instead of the chosen trainsetType
-    
+    minTrainedModelsPercentilForModelChoice % if percentile of oldest models that are trained
+                                            % drops below this value, we try newer generations of models
+    maxGenerationShiftForModelChoice  % stops trying to find trained generation 
+                                      % and switches to likelihood after this value of searched generations                                
   end
   
   methods (Access = public)
@@ -56,7 +58,24 @@ classdef ModelPool < Model
       obj.xMean = xMean;
       obj.modelsCount = length(modelOptions.parameterSets);
       assert(obj.modelsCount ~= 0, 'ModelPool(): No model provided!');
-      obj.historyLength = defopts(modelOptions, 'historyLength', 4);
+      
+      if (strcmpi(obj.bestModelSelection, 'likelihood')) 
+        % likelihood selection does not need older models
+        obj.historyLength = 0;
+      else
+        obj.historyLength = defopts(modelOptions, 'historyLength', 4);
+        if (obj.historyLength < 2)
+          warning('ModelPool: history length needs to be at least 2 in order to choose from at least 1 point, choosing 2 as value.');
+          obj.historyLength = 2;
+        end
+        obj.minTrainedModelsPercentilForModelChoice = defopts(modelOptions, 'minTrainedModelsPercentilForModelChoice', 0.25);
+        obj.maxGenerationShiftForModelChoice = defopts(modelOptions, 'maxGenerationShiftForModelChoice', 1);
+        if obj.maxGenerationShiftForModelChoice >= obj.historyLength -1
+          warning('ModelPool: maxGenerationShiftForModelChoice is too high, choosing %d as value.', obj.historyLength - 2)
+          obj.maxGenerationShiftForModelChoice = obj.historyLength - 2;
+        end
+      end
+      
       obj.retrainPeriod = defopts(modelOptions, 'retrainPeriod', 1);
       obj.models = cell(obj.modelsCount,obj.historyLength+1);
       obj.isModelTrained = false(obj.modelsCount,obj.historyLength+1);
@@ -65,7 +84,7 @@ classdef ModelPool < Model
       obj.shiftMean = zeros(1, obj.dim);
       obj.shiftY    = 0;
       obj.stdY      = 1;
-      obj.switchToLikelihoodPercentile = defopts(modelOptions, 'switchToLikelihoodPercentile', 0.25);
+      obj.bestModelSelection = defopts(modelOptions, 'bestModelSelection', 'mse');
       
       % general model prediction options
       obj.predictionType = defopts(modelOptions, 'predictionType', 'fValues');
@@ -140,7 +159,7 @@ classdef ModelPool < Model
         else
           obj.trainGeneration = generation;
           
-          [obj.bestModelIndex,obj.choosingCriterium] = obj.chooseBestModel(generation);
+          [obj.bestModelIndex,obj.choosingCriterium] = obj.chooseBestModel(generation, population);
           obj.bestModelsHistory(obj.bestModelIndex) = obj.bestModelsHistory(obj.bestModelIndex)+1;
           obj = obj.copyPropertiesFromBestModel();
         end
@@ -162,31 +181,41 @@ classdef ModelPool < Model
   end
   
   methods (Access = public)
-    function [bestModelIndex, choosingCriterium] = chooseBestModel(obj, lastGeneration)
+    function [bestModelIndex, choosingCriterium] = chooseBestModel(obj, lastGeneration, population)
       
       if (isempty(lastGeneration))
         lastGeneration = 0;
       end
       
-      trainedPercentile = mean(obj.isModelTrained(:,end));
+      ageOfTestedModels = -1;
+      for i = obj.historyLength+1 : -1 : obj.historyLength+1 - obj.maxGenerationShiftForModelChoice;
+        trainedPercentile = mean(obj.isModelTrained(:,i));
+        
+        if (trainedPercentile >= obj.minTrainedModelsPercentilForModelChoice)
+          ageOfTestedModels = i;
+          break;
+        end
+      end
       
-      if trainedPercentile < obj.switchToLikelihoodPercentile ...
-          || strcmpi(obj.modelPoolOptions.bestModelSelection,'likelihood')
+      if (ageOfTestedModels == -1 || strcmpi(obj.modelPoolOptions.bestModelSelection,'likelihood'))
         choosingCriterium = obj.getLikelihood();
       else
-        switch lower(obj.modelPoolOptions.bestModelSelection)
+        switch lower(obj.bestModelSelection)
           case 'rdeorig'
-            choosingCriterium = obj.getRdeOrig(lastGeneration);
+            choosingCriterium = obj.getRdeOrig(ageOfTestedModels, lastGeneration);
           case 'rdeall'
-            choosingCriterium = obj.getRdeAll();
+            choosingCriterium = obj.getRdeAll(ageOfTestedModels, population);
           case 'mse'
-            choosingCriterium = obj.getMse(lastGeneration);
+            choosingCriterium = obj.getMse(ageOfTestedModels, lastGeneration);
+          case 'mae'
+            choosingCriterium = obj.getMae(ageOfTestedModels, lastGeneration);
           otherwise
             error(['ModelPool.chooseBestModel: ' obj.modelPoolOptions.bestModelSelection ' -- no such option available']);
         end
       end
       % choose the best model from trained ones according to the choosing criterium
-      [~,bestModelIndex] = min(choosingCriterium(obj.isModelTrained(:,1)));
+      [minValue,bestModelIndex] = min(choosingCriterium(obj.isModelTrained(:,1)));
+      assert(minValue~=Inf, 'ModelPool.chooseBestModel: value of minimum is Inf.');
     end
     
     function obj = copyPropertiesFromBestModel(obj)
@@ -210,15 +239,14 @@ classdef ModelPool < Model
       obj.sampleOpts = obj.models{obj.bestModelIndex,1}.sampleOpts;
     end
     
-    function choosingCriterium = getRdeOrig(obj, lastGeneration)
+    function choosingCriterium = getRdeOrig(obj, ageOfTestedModels, lastGeneration)
       choosingCriterium = Inf(obj.modelsCount,1);
       for i=1:obj.modelsCount
-        generations = obj.models{i,end}.trainGeneration+1:lastGeneration;
+        generations = obj.models{i,ageOfTestedModels}.trainGeneration+1:lastGeneration;
         [X,yArchive] = obj.archive.getDataFromGenerations(generations);
         if (size(X,1)~=0)
-          if (~isempty(obj.models{i,end}))
-            %because we test the oldest models
-            [yModel, ~] = obj.models{i,end}.modelPredict(X);
+          if (obj.isModelTrained(i,ageOfTestedModels))
+            [yModel, ~] = obj.models{i,ageOfTestedModels}.modelPredict(X);
             if (size(yArchive)==size(yModel))
               choosingCriterium(i) = errRankMu(yModel,yArchive,size(yArchive,1));
             end
@@ -227,39 +255,71 @@ classdef ModelPool < Model
       end
     end
     
-    function choosingCriterium = getRdeAll(obj)
+    function choosingCriterium = getRdeAll(obj, ageOfTestedModels, population)
+      choosingCriterium = Inf(obj.modelsCount,1);
+      for modelIndex=1:obj.modelsCount
+        partialCriteriumValues = [];
+        for modelAge=ageOfTestedModels : -1 : 2
+          if obj.isModelTrained(modelIndex,modelAge)
+            testedModel = obj.models{modelIndex,modelAge};
+            nextModel = obj.models{modelIndex,modelAge-1};
+            
+            [~, xSample] = sampleCmaesNoFitness(...
+              nextModel.trainSigma, ...
+              nextModel.stateVariables.lambda, ...
+              nextModel.stateVariables, ...
+              nextModel.sampleOpts);
+            % get points from archive
+            [origPoints_X, origPoints_y] = obj.archive.getDataFromGenerations(testedModel.trainGeneration+1);
+            if (modelAge==2) %we are testing newest model, add points from population if they are available
+              if (isempty(origPoints_y))
+                origPoints_X = population.x(:,population.origEvaled)';
+                origPoints_y = population.y(:,population.origEvaled)';
+              else
+                origPoints_X = [ origPoints_X ; population.x(:,population.origEvaled)'];
+                origPoints_y = [ origPoints_y ; population.y(:,population.origEvaled)'];
+              end
+            end
+            xSample(:,1:size(origPoints_X,1)) = origPoints_X(1:size(origPoints_X,1),:)';
+            ySample = testedModel.predict(xSample');
+            yWithOrig = ySample;
+            % replace predicted values with original values
+            yWithOrig(1:size(origPoints_y,1)) = origPoints_y;
+            partialCriteriumValues(end+1,1) = errRankMu(ySample,yWithOrig,size(yWithOrig,1));
+          end
+        end
+        n = length(partialCriteriumValues);
+        weights = 2.^(-(1:n)) ./ sum(2.^(-(1:n)));
+        choosingCriterium(modelIndex) = weights * partialCriteriumValues ./ sum(weights);
+      end
+    end
+    
+    function choosingCriterium = getMse(obj, ageOfTestedModels, lastGeneration)
       choosingCriterium = Inf(obj.modelsCount,1);
       for i=1:obj.modelsCount
-        model = obj.models{i,obj.historyLength+1};
-        if ~isempty(model)
-          [~, xSample] = sampleCmaesNoFitness(...
-            model.trainSigma, ...
-            model.stateVariables.lambda, ...
-            model.stateVariables, ...
-            model.sampleOpts);
-          % get points from archive
-          [origPoints_X, origPoints_y] = obj.archive.getDataFromGenerations(model.trainGeneration+1);
-          xSample(1:size(origPoints_X,1)) = origPoints_X(1:size(origPoints_X,1));
-          ySample = model.predict(xSample');
-          yWithOrig = ySample;
-          % replace predicted values with original values
-          yWithOrig(1:size(origPoints_y,1)) = origPoints_y;
-          choosingCriterium(i) = errRankMu(ySample,yWithOrig,size(yWithOrig,1));
+        generations=obj.models{i,ageOfTestedModels}.trainGeneration+1:lastGeneration;
+        [X,yArchive] = obj.archive.getDataFromGenerations(generations);
+        if (size(X,1)~=0)
+          if (obj.isModelTrained(i,ageOfTestedModels))
+            [yModel, ~] = obj.models{i, ageOfTestedModels}.modelPredict(X);
+            if (size(yArchive)==size(yModel))
+              choosingCriterium(i) = sqrt(sum((yModel - yArchive).^2));
+            end
+          end
         end
       end
     end
     
-    function choosingCriterium = getMse(obj, lastGeneration)
+    function choosingCriterium = getMae(obj, ageOfTestedModels, lastGeneration)
       choosingCriterium = Inf(obj.modelsCount,1);
       for i=1:obj.modelsCount
-        generations=obj.models{i,end}.trainGeneration+1:lastGeneration;
+        generations=obj.models{i,ageOfTestedModels}.trainGeneration+1:lastGeneration;
         [X,yArchive] = obj.archive.getDataFromGenerations(generations);
         if (size(X,1)~=0)
-          if (~isempty(obj.models{i,end}))
-            %because we test the oldest models
-            [yModel, ~] = obj.models{i,end}.modelPredict(X);
+          if (obj.isModelTrained(i,ageOfTestedModels))
+            [yModel, ~] = obj.models{i,ageOfTestedModels}.modelPredict(X);
             if (size(yArchive)==size(yModel))
-              choosingCriterium(i) = sqrt(sum((yModel - yArchive).^2));
+              choosingCriterium(i) = sum(abs(yModel - yArchive));
             end
           end
         end
