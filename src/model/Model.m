@@ -261,7 +261,8 @@ classdef (Abstract) Model
       obj.trainMean = xMean;
       obj.stateVariables = stateVariables;
       
-      if (~isempty(archive) && ~strcmpi(obj.options.trainsetType,'parameters') )
+      trainsetType = defopts(obj.options,'trainsetType','parameters');
+      if (~isempty(archive) && ~strcmpi(trainsetType, 'parameters'))
           [X, y] = obj.generateDataset(archive, population);
       end
 
