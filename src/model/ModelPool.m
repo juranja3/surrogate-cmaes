@@ -215,7 +215,13 @@ classdef ModelPool < Model
       end
       % choose the best model from trained ones according to the choosing criterium
       [minValue,bestModelIndex] = min(choosingCriterium(obj.isModelTrained(:,1)));
-      assert(minValue~=Inf, 'ModelPool.chooseBestModel: value of minimum is Inf.');
+      if minValue==Inf
+        bestModelIndex = 1;
+        if (mean(obj.isModelTrained(:,i))>0)
+          warning('ModelPool.chooseBestModel: value of minimum is Inf, ageOfTestedModels %d, percentile of trainedModels %d', ...
+            ageOfTestedModels, mean(obj.isModelTrained(:,i)));
+        end
+      end
     end
     
     function obj = copyPropertiesFromBestModel(obj)
