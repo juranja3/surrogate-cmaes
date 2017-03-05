@@ -69,8 +69,13 @@ classdef GpModel < Model
         obj.options.hyp = struct();
       end
       obj.hyp.lik = defopts(obj.options.hyp, 'lik', log(0.01));  % should be somewhere between log(0.01) and log(1)
-      obj.hyp.cov = defopts(obj.options.hyp, 'cov', log([0.5; 2]));   % should be somewhere between log([0.1 2]) and log([2 1e6])
       covFcn = defopts(obj.options, 'covFcn',  '{@covMaterniso, 5}');
+      if (strcmpi(covFcn, '{@covSEard}'))
+        obj.hyp.cov = myeval(defopts(obj.options.hyp, 'cov', log([0.5*ones(obj.dim,1); 2])));   % should be somewhere between log([0.1 2]) and log([2 1e6])
+      else
+        obj.hyp.cov = myeval(defopts(obj.options.hyp, 'cov', log([0.5; 2])));   % should be somewhere between log([0.1 2]) and log([2 1e6])
+      end
+      
       if (exist(covFcn) == 2)
         % string with name of an m-file function
         obj.covFcn  = str2func(covFcn);
@@ -126,8 +131,10 @@ classdef GpModel < Model
       end
 
       % set the mean hyperparameter if is needed
-      if (~isequal(obj.meanFcn, @meanZero))
+      if (isequal(obj.meanFcn, @meanConst))
         obj.hyp.mean = median(yTrain);
+      elseif (isequal(obj.meanFcn, @meanLinear))
+        obj.hyp.mean = median(yTrain) * ones(obj.dim,1);
       end
 
       alg = obj.options.trainAlgorithm;
@@ -376,7 +383,20 @@ classdef GpModel < Model
         maxY = max(yTrain);
         lb_hyp.mean = minY - 2*(maxY - minY);
         ub_hyp.mean = minY + 2*(maxY - minY);
+      elseif (isequal(obj.meanFcn, @meanLinear))
+        min_y = min(yTrain);
+        max_y = max(yTrain);
+        for i=1:obj.dim
+          % max_x -- max of each dimension from dataset_X
+          dataset_X = obj.getDataset_X();
+          max_x = max(dataset_X(:,i));
+          min_x = min(dataset_X(:,i));
+          max_tg = (max_y - min_y) / (max_x - min_x);
+          lb_hyp.mean(i) = - max_tg;
+          ub_hyp.mean(i) = max_tg;
+        end
       end
+      
     end
   end
 end
