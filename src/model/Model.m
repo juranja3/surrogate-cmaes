@@ -262,7 +262,7 @@ classdef (Abstract) Model
       obj.stateVariables = stateVariables;
       
       trainsetType = defopts(obj.options,'trainsetType','parameters');
-      if (~isempty(archive) && ~strcmpi(trainsetType, 'parameters'))
+      if (~strcmpi(trainsetType, 'parameters') && exist('archive','var'))
           [X, y] = obj.generateDataset(archive, population);
       end
 
@@ -345,7 +345,7 @@ classdef (Abstract) Model
         sigma = obj.stateVariables.sigma;
         BD = obj.stateVariables.BD;
         [X,y] = archive.getTrainsetData(obj.options.trainsetType,...
-            obj.options.trainsetSizeMax, xMean, obj.options.calculatedTrainRange,...
+            myeval(obj.options.trainsetSizeMax), xMean, obj.options.calculatedTrainRange,...
             sigma, BD, population);
     end
   end

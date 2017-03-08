@@ -86,7 +86,7 @@ classdef Archive < handle
       end
     end
     
-    function [X, y] = getClosestDataFromPoints(obj, n, xInput, sigma, BD)
+    function [X, y] = getClosestDataFromPoints(obj, n, xInput, sigma, BD, trainRange)
       % returns union of 'n'-tuples of points which are closest to each
       % of data points from the points in 'xInput'
       % using (sigma*BD)-metric
@@ -98,41 +98,8 @@ classdef Archive < handle
         return;
       end
       
-      if (nData > n)
-        % there are more data than 'n'
-        indicesToReturn = false(size(obj.y,1),1);
-        
-        % compute coordinates in the (sigma*BD)-basis
-        BDinv = inv(sigma*BD);
-        % for each point from xInput:
-        for i = 1:size(xInput,1)
-          xTransf = ( BDinv * (obj.X - repmat(xInput(i,:),nData,1))' )';
-          diff = sum(xTransf.^2, 2);
-          % take up to 'n' closest points from current point xInput(i,:)
-          [~, closest] = sort(diff);
-          closest((n+1):end) = [];
-          % union these points with the previous points
-          indicesToReturn(closest) = true;
-        end
-      else
-        indicesToReturn = true(size(obj.y,1),1);
-      end
-      
-      % return the final points
-      X = obj.X(indicesToReturn,:);
-      y = obj.y(indicesToReturn);
-    end
-    
-    function [X, y] = getClosestDataFromPointsInTrainRange(obj, n, xInput, trainRange, sigma, BD)
-      % returns union of 'n'-tuples of points which are closest to each
-      % of data points from the points in 'xInput'
-      % using (sigma*BD)-metric
-      % if (n == 0), all the available data are returned
-      nData = length(obj.y);
-      X = []; y = [];
-      
-      if (nData == 0)
-        return;
+      if (~exist('trainRange','var'))
+        trainRange=Inf;
       end
       
       if (nData > n)
@@ -168,7 +135,7 @@ classdef Archive < handle
       y = obj.y(indicesToReturn);
     end
     
-    function [X, y] = getClosestDataFromPopulation(obj, n, trainRange, population, sigma, BD)
+    function [X, y] = getClosestDataFromPopulation(obj, n, population, trainRange, sigma, BD)
       % returns points which are closest to each
       % of data points from the points in 'population'
       % using (sigma*BD)-metric
@@ -229,7 +196,7 @@ classdef Archive < handle
         case 'clustering'
           [X, y] = obj.getDataNearPoint(trainsetSizeMax, xMean, trainRange, sigma, BD);
         case 'nearest'
-          [X, y] = obj.getClosestDataFromPointsInTrainRange(trainsetSizeMax, xMean, trainRange, sigma, BD);
+          [X, y] = obj.getClosestDataFromPoints(trainsetSizeMax, xMean, sigma, BD, trainRange);
         case 'nearesttopopulation'
           [X, y] = obj.getClosestDataFromPopulation(trainsetSizeMax, population, trainRange, sigma, BD);
       end

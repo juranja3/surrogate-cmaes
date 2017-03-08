@@ -134,7 +134,7 @@ classdef GpModel < Model
       if (isequal(obj.meanFcn, @meanConst))
         obj.hyp.mean = median(yTrain);
       elseif (isequal(obj.meanFcn, @meanLinear))
-        obj.hyp.mean = median(yTrain) * ones(obj.dim,1);
+        obj.hyp.mean = median(yTrain) / obj.dim * ones(obj.dim,1);
       end
 
       alg = obj.options.trainAlgorithm;
@@ -392,8 +392,8 @@ classdef GpModel < Model
           max_x = max(dataset_X(:,i));
           min_x = min(dataset_X(:,i));
           max_tg = (max_y - min_y) / (max_x - min_x);
-          lb_hyp.mean(i) = - max_tg;
-          ub_hyp.mean(i) = max_tg;
+          lb_hyp.mean(i) = -5 * max_tg;
+          ub_hyp.mean(i) = 5 * max_tg;
         end
       end
       

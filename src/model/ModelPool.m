@@ -36,7 +36,7 @@ classdef ModelPool < Model
     archive
     modelsCount           % number of models in the modelPool
     historyLength         % number of older models that are saved
-    models                %instances of models, 2D cell array of modelscount*historyLength+1
+    models                % instances of models, 2D cell array of modelscount*historyLength+1
     isModelTrained        % 2D array, 0 if model at this position in models property is trained, 1 otherwise
     bestModelIndex
     bestModelsHistory     % how many times has been each model chosen as the best one
@@ -133,6 +133,8 @@ classdef ModelPool < Model
     
     function obj = train(obj, X, y, stateVariables, sampleOpts, archive, population)
       obj.archive = archive;
+      obj.stateVariables = stateVariables;
+      obj.sampleOpts = sampleOpts;
       obj.xMean = stateVariables.xmean';
       generation = stateVariables.countiter;
       if (mod(generation,obj.retrainPeriod)==0)
@@ -261,7 +263,7 @@ classdef ModelPool < Model
       end
     end
     
-    function choosingCriterium = getRdeAll(obj, ageOfTestedModels, population)
+    function choosingCriterium = getRdeAll(obj, ageOfTestedModels, population, mu)
       choosingCriterium = Inf(obj.modelsCount,1);
       for modelIndex=1:obj.modelsCount
         partialCriteriumValues = [];
@@ -277,26 +279,25 @@ classdef ModelPool < Model
               nextModel.sampleOpts);
             % get points from archive
             [origPoints_X, origPoints_y] = obj.archive.getDataFromGenerations(testedModel.trainGeneration+1);
-            if (modelAge==2) %we are testing newest model, add points from population if they are available
-              if (isempty(origPoints_y))
-                origPoints_X = population.x(:,population.origEvaled)';
-                origPoints_y = population.y(:,population.origEvaled)';
-              else
+            if (modelAge == 2) %we are testing newest model, add points from population if they are available
                 origPoints_X = [ origPoints_X ; population.x(:,population.origEvaled)'];
                 origPoints_y = [ origPoints_y ; population.y(:,population.origEvaled)'];
-              end
             end
             xSample(:,1:size(origPoints_X,1)) = origPoints_X(1:size(origPoints_X,1),:)';
             ySample = testedModel.predict(xSample');
             yWithOrig = ySample;
             % replace predicted values with original values
             yWithOrig(1:size(origPoints_y,1)) = origPoints_y;
-            partialCriteriumValues(end+1,1) = errRankMu(ySample,yWithOrig,size(yWithOrig,1));
+            partialCriteriumValues(end+1,1) = errRankMu(ySample, yWithOrig, obj.stateVariables.mu);
+          else
+            partialCriteriumValues(end+1,1) = NaN;
           end
         end
-        n = length(partialCriteriumValues);
+        x = partialCriteriumValues;
+        n = length(x);
         weights = 2.^(-(1:n)) ./ sum(2.^(-(1:n)));
-        choosingCriterium(modelIndex) = weights * partialCriteriumValues ./ sum(weights);
+        choosingCriterium(modelIndex) = weights(~isnan(x)) * x(~isnan(x)) ./ sum(weights(~isnan(x)));
+        
       end
     end
     
@@ -309,7 +310,7 @@ classdef ModelPool < Model
           if (obj.isModelTrained(i,ageOfTestedModels))
             [yModel, ~] = obj.models{i, ageOfTestedModels}.modelPredict(X);
             if (size(yArchive)==size(yModel))
-              choosingCriterium(i) = sqrt(sum((yModel - yArchive).^2));
+              choosingCriterium(i) = sum((yModel - yArchive).^2)/size(yArchive);
             end
           end
         end
@@ -325,7 +326,7 @@ classdef ModelPool < Model
           if (obj.isModelTrained(i,ageOfTestedModels))
             [yModel, ~] = obj.models{i,ageOfTestedModels}.modelPredict(X);
             if (size(yArchive)==size(yModel))
-              choosingCriterium(i) = sum(abs(yModel - yArchive));
+              choosingCriterium(i) = sum(abs(yModel - yArchive))/size(yArchive);
             end
           end
         end
