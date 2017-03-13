@@ -344,6 +344,7 @@ classdef (Abstract) Model
         xMean = obj.stateVariables.xmean';
         sigma = obj.stateVariables.sigma;
         BD = obj.stateVariables.BD;
+        dim = obj.dim;
         [X,y] = archive.getTrainsetData(obj.options.trainsetType,...
             myeval(obj.options.trainsetSizeMax), xMean, obj.options.calculatedTrainRange,...
             sigma, BD, population);
