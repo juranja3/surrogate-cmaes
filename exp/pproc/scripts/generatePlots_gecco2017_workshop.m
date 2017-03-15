@@ -34,9 +34,8 @@ exppath = fullfile('exp', 'experiments');
 
 gen_path = fullfile(exppath, 'exp_geneEC_10');
 gen_path20D = fullfile(exppath, 'exp_geneEC_10_20D');
-% TODO: replace DTS and MAESby more recent results
 dts_path = fullfile(exppath, 'DTS-CMA-ES_05_2pop');
-maes_path = fullfile(exppath, 'CMA-ES');
+maes_path = fullfile(exppath, 'exp_maesEC_14_2_10_cmaes_20D');
 
 cmaes_path = fullfile(exppath, 'CMA-ES');
 saacmes_path = fullfile(exppath, 'BIPOP-saACM-k');
@@ -64,16 +63,19 @@ findSet.evoControlModelGenerations = 1;
 rf_Id = getStructIndex(settings, findSet);
 
 clear findSet
+findSet.evoControl = 'maes';
+findSet.modelOpts.predictionType = 'fvalues';
+ma_Id = getStructIndex(settings, findSet);
+
+clear findSet
 findSet.algName = 'CMA-ES';
 cma_Id = getStructIndex(settings, findSet);
-findSet.algName = 'MA-ES';
-ma_Id = getStructIndex(settings, findSet);
 findSet.algName = 'BIPOP-saACM-k';
 saacm_Id = getStructIndex(settings, findSet);
-findSet.algName = 'DTS-CMA-ES_05_2pop';
-dts_Id = getStructIndex(settings, findSet);
 findSet.algName = 'lmm-CMA-ES';
 lmm_Id = getStructIndex(settings, findSet);
+findSet.algName = 'DTS-CMA-ES_05_2pop';
+dts_Id = getStructIndex(settings, findSet);
              
 % extract data
 scmaes_gp_data = evals(:, :, gp_Id);
@@ -85,9 +87,9 @@ dtscmaes_data  = evals(:, :, dts_Id);
 lmmcmaes_data  = evals(:, :, lmm_Id);
 
 % color settings
-scmaes_rfCol = getAlgColors(1);
+scmaes_rfCol = getAlgColors(2);
 scmaes_gpCol = getAlgColors('scmaes');
-maesCol      = getAlgColors(2);
+maesCol      = getAlgColors(3);
 cmaesCol     = getAlgColors('cmaes');
 saacmesCol   = getAlgColors('saacmes');
 dtsCol       = getAlgColors('dtscmaes');
@@ -99,8 +101,8 @@ end
 
 end
 
-%% Algorithm comparison: DTS-CMA-ES, S-CMA-ES, saACMES, SMAC, CMA-ES
-% Aggregation of function values across dimensions 2, 5, 10, 20.
+%% Algorithm comparison: CMA-ES, MA-ES, lmm-CMA-ES, saACMES, S-CMA-ES, DTS-CMA-ES  
+% Scaled function values of f1-f24 in dimension 5.
 
 data = {cmaes_data, ...
         maes_data, ...
@@ -114,25 +116,111 @@ datanames = {'CMA-ES', 'MA-ES', 'lmm-CMA-ES', 'BIPOP-{}^{s*}ACMES-k', 'S-CMA-ES 
 
 colors = [cmaesCol; maesCol; lmmCol; saacmesCol; scmaes_gpCol; scmaes_rfCol; dtsCol]/255;
 
-plotFuns = 1:3;
-plotDims = [5, 20];
+plotFuns = 1:24;
+plotDims = 5;
 
 clear pdfNames
-pdfNames = fullfile(plotResultsFolder, 'alg2_5_10_20D');
+pdfNames = {};
+for f = plotFuns
+  for d = plotDims
+    pdfNames{end+1} = fullfile(plotResultsFolder, sprintf('alg_f%d_%dD', f, d));
+  end
+end
 
 close all
 han = relativeFValuesPlot(data, ...
                               'DataNames', datanames, 'DataDims', funcSet.dims, ...
                               'DataFuns', funcSet.BBfunc, 'Colors', colors, ...
                               'PlotFuns', plotFuns, 'PlotDims', plotDims, ...
-                              'AggregateDims', false, 'OneFigure', true, ...
+                              'AggregateDims', false, 'OneFigure', false, ...
                               'Statistic', @median, 'AggregateFuns', false, ...
-                              'LineSpecification', {'-', '-', '-', '-', '-', '-'}, ...
-                              'LegendOption', 'split', 'MaxEval', maxEvals);
+                              'LineSpecification', {'-', '-', '-', '-', '-', '-', '-'}, ...
+                              'LegendOption', 'split', 'MaxEval', maxEvals, ...
+                              'FunctionNames', true);
 
                               
                             
-% print2pdf(han, pdfNames, 1)
+print2pdf(han, pdfNames, 1)
+
+%% Algorithm comparison: CMA-ES, MA-ES, lmm-CMA-ES, saACMES, S-CMA-ES, DTS-CMA-ES  
+% Scaled function values of f1-f24 in dimension 20.
+
+data = {cmaes_data, ...
+        maes_data, ...
+        lmmcmaes_data, ...
+        saacmes_data, ...
+        scmaes_gp_data, ...
+        scmaes_rf_data, ...
+        dtscmaes_data};
+
+datanames = {'CMA-ES', 'MA-ES', 'lmm-CMA-ES', 'BIPOP-{}^{s*}ACMES-k', 'S-CMA-ES GP', 'S-CMA-ES RF', 'DTS-CMA-ES'};
+
+colors = [cmaesCol; maesCol; lmmCol; saacmesCol; scmaes_gpCol; scmaes_rfCol; dtsCol]/255;
+
+plotFuns = 1:24;
+plotDims = 20;
+
+clear pdfNames
+pdfNames = {};
+for f = plotFuns
+  for d = plotDims
+    pdfNames{end+1} = fullfile(plotResultsFolder, sprintf('alg_f%d_%dD', f, d));
+  end
+end
+
+close all
+han = relativeFValuesPlot(data, ...
+                              'DataNames', datanames, 'DataDims', funcSet.dims, ...
+                              'DataFuns', funcSet.BBfunc, 'Colors', colors, ...
+                              'PlotFuns', plotFuns, 'PlotDims', plotDims, ...
+                              'AggregateDims', false, 'OneFigure', false, ...
+                              'Statistic', @median, 'AggregateFuns', false, ...
+                              'LineSpecification', {'-', '-', '-', '-', '-', '-', '-'}, ...
+                              'LegendOption', 'split', 'MaxEval', maxEvals, ...
+                              'FunctionNames', true);
+
+                              
+                            
+print2pdf(han, pdfNames, 1)
+
+%% Aggregated algorithm comparison: CMA-ES, MA-ES, lmm-CMA-ES, saACMES, S-CMA-ES, DTS-CMA-ES  
+% Aggregated  scaled function values in dimensions 5 and 20.
+
+data = {cmaes_data, ...
+        maes_data, ...
+        lmmcmaes_data, ...
+        saacmes_data, ...
+        scmaes_gp_data, ...
+        scmaes_rf_data, ...
+        dtscmaes_data};
+
+datanames = {'CMA-ES', 'MA-ES', 'lmm-CMA-ES', 'BIPOP-{}^{s*}ACMES-k', 'S-CMA-ES GP', 'S-CMA-ES RF', 'DTS-CMA-ES'};
+
+colors = [cmaesCol; maesCol; lmmCol; saacmesCol; scmaes_gpCol; scmaes_rfCol; dtsCol]/255;
+
+plotFuns = 1:24;
+plotDims = [5, 20];
+
+clear pdfNames
+pdfNames = {};
+for d = plotDims
+  pdfNames{end+1} = fullfile(plotResultsFolder, sprintf('alg_%dD', d));
+end
+
+close all
+han = relativeFValuesPlot(data, ...
+                              'DataNames', datanames, 'DataDims', funcSet.dims, ...
+                              'DataFuns', funcSet.BBfunc, 'Colors', colors, ...
+                              'PlotFuns', plotFuns, 'PlotDims', plotDims, ...
+                              'AggregateDims', false, 'OneFigure', false, ...
+                              'Statistic', @median, 'AggregateFuns', true, ...
+                              'LineSpecification', {'-', '-', '-', '-', '-', '-', '-'}, ...
+                              'LegendOption', 'split', 'MaxEval', maxEvals, ...
+                              'FunctionNames', true);
+
+                              
+                            
+print2pdf(han, pdfNames, 1)
                          
 %% final clearing
 close all
