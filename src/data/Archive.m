@@ -25,7 +25,12 @@ classdef Archive < handle
       end
       obj.X = [obj.X; X(isNotYetSaved,:)];
       obj.y = [obj.y; y(isNotYetSaved,:)];
-      obj.gens = [obj.gens; generation * ones(sum(isNotYetSaved),1)];
+      if (length(generation) == 1)
+        obj.gens = [obj.gens; generation * ones(sum(isNotYetSaved),1)];
+      else
+        generation = generation(:);     % ensure column vector
+        obj.gens = [obj.gens; generation(isNotYetSaved)];
+      end
     end
     
     function [X, y] = getDataFromGenerations(obj, generations)
@@ -45,18 +50,17 @@ classdef Archive < handle
       %   nData -- the number of all available data in the specified range
       nData = length(obj.y);
       X = []; y = [];
-      
+
       if (nData == 0)
         return;
       end
       
       % compute coordinates in the (sigma*BD)-basis
-      BDinv = inv(sigma*BD);
-      xTransf = ( BDinv * (obj.X - repmat(x,nData,1))' )';
-      
+      xTransf = ( (sigma * BD) \ (obj.X - repmat(x,nData,1))' )';
+
       % take the points closer than *rangeSigma*
-      diff = sum(xTransf.^2, 2);
-      isInRange = diff < (rangeSigma ^ 2);
+      diff2 = sum(xTransf.^2, 2);
+      isInRange = diff2 < (rangeSigma ^ 2);
       nData = sum(isInRange);
       
       if (nData <= n  ||  n <= 0)
@@ -85,7 +89,7 @@ classdef Archive < handle
         end
       end
     end
-    
+
     function [X, y] = getClosestDataFromPoints(obj, n, xInput, sigma, BD, trainRange)
       % returns union of 'n'-tuples of points which are closest to each
       % of data points from the points in 'xInput'
@@ -93,15 +97,15 @@ classdef Archive < handle
       % if (n == 0), all the available data are returned
       nData = length(obj.y);
       X = []; y = [];
-      
+
       if (nData == 0)
         return;
       end
-      
+
       if (~exist('trainRange','var'))
         trainRange=Inf;
       end
-      
+
       if (nData > n)
         % there are more data than 'n'
         indicesToReturn = false(size(obj.y,1),1);
@@ -111,30 +115,25 @@ classdef Archive < handle
         % for each point from xInput:
         for i = 1:size(xInput,1)
           xTransf = ( BDinv * (obj.X - repmat(xInput(i,:),nData,1))' )';
-          diff = sum(xTransf.^2, 2);
-          isInRange = diff < (trainRange ^ 2);
+          diff2 = sum(xTransf.^2, 2);
+          isInRange = diff2 < (trainRange ^ 2);
           % take up to 'n' closest points from current point xInput(i,:)
-          [~, closest] = sort(diff);
+          [~, closest] = sort(diff2);
           closest((n+1):end) = [];
-          
+
           % union these points with the previous points, if they are in
           % trainRange
-          for j = 1:size(closest)
-            point = closest(j);
-            if (isInRange(point))
-              indicesToReturn(point) = true;
-            end
-          end
+          indicesToReturn(closest) = true;
         end
       else
         indicesToReturn = true(size(obj.y,1),1);
       end
-      
+
       % return the final points
       X = obj.X(indicesToReturn,:);
       y = obj.y(indicesToReturn);
     end
-    
+
     function [X, y] = getClosestDataFromPopulation(obj, n, population, trainRange, sigma, BD)
       % returns points which are closest to each
       % of data points from the points in 'population'
@@ -142,48 +141,49 @@ classdef Archive < handle
       % if (n == 0), all the available data are returned
       nData = length(obj.y);
       X = []; y = [];
-      
+
       if (nData == 0)
         return;
       end
-      
+
       if (nData > n)
         % there are more data than 'n'
         indicesToReturn = false(size(obj.y,1),1);
-        
+
         % compute coordinates in the (sigma*BD)-basis
         BDinv = inv(sigma*BD);
         % for each point from population:
         for i = 1:size(population.x,2)
           xTransf = ( BDinv * (obj.X - repmat(population.x(:,i)',nData,1))' )';
           if i==1
-            diff = sum(xTransf.^2, 2);
+            diff2 = sum(xTransf.^2, 2);
           else
-            diff = min(diff, sum(xTransf.^2, 2));
+            diff2 = min(diff2, sum(xTransf.^2, 2));
           end
         end
         % take up to 'n' closest points
-        isInRange = diff < (trainRange ^ 2);
-        [~, closest] = sort(diff);
+        isInRange = diff2 < (trainRange ^ 2);
+        [~, closest] = sort(diff2);
         closest((n+1):end) = [];
         % take only points that are in trainRange
-        for j = 1:size(closest)
-          point = closest(j);
-          if (isInRange(point))
-            indicesToReturn(point) = true;
-          end
-        end
-        
+        indicesToReturn(closest) = true;
       else
         indicesToReturn = true(size(obj.y,1),1);
       end
-      
+
       % return the final points
       X = obj.X(indicesToReturn,:);
       y = obj.y(indicesToReturn);
     end
-    
+
     function [X, y] = getTrainsetData(obj, trainsetType, trainsetSizeMax, xMean, trainRange, sigma, BD, population)
+
+      % if the trainRange is specified as quantile from Chi2,
+      % convert the number to the metric value
+      if (isnumeric(trainRange) && trainRange >= 0.9 && trainRange <= 1.0)
+        trainRange = sqrt(chi2inv(trainRange, obj.dim));
+      end
+
       switch lower(trainsetType)
         case 'allpoints'
           %get all data in range (0 as first parameter)
@@ -200,6 +200,20 @@ classdef Archive < handle
         case 'nearesttopopulation'
           [X, y] = obj.getClosestDataFromPopulation(trainsetSizeMax, population, trainRange, sigma, BD);
       end
+    end
+
+    function obj2 = duplicate(obj)
+      obj2 = Archive(obj.dim);
+      obj2.X = obj.X;
+      obj2.y = obj.y;
+      obj2.gens = obj.gens;
+    end
+
+    function obj = restrictToGenerations(obj, toGens)
+      id_gens = ismember(obj.gens, toGens);
+      obj.X = obj.X(id_gens, :);
+      obj.y = obj.y(id_gens, :);
+      obj.gens = obj.gens(id_gens);
     end
   end
 end
