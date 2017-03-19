@@ -70,7 +70,7 @@ function [stats, models, y_models] = testOneModel(modelType, modelOpts, ds, nSna
     
     m = m.train(X_train, y_train, ds.cmaesStates{i}, ds.sampleOpts{i}, ...
         thisArchive, thisPopulation);
-    
+
     if m.isTrained()
       y = ds.testSetY{i};
       y_models{i} = m.predict(ds.testSetX{i});
