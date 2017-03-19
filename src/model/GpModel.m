@@ -414,11 +414,13 @@ classdef GpModel < Model
         for i=1:obj.dim
           % max_x -- max of each dimension from dataset_X
           dataset_X = obj.getDataset_X();
-          max_x = max(dataset_X(:,i));
-          min_x = min(dataset_X(:,i));
-          max_tg = (max_y - min_y) / (max_x - min_x);
-          lb_hyp.mean(i) = -5 * max_tg;
-          ub_hyp.mean(i) = 5 * max_tg;
+          if (~isempty(dataset_X))
+            max_x = max(dataset_X(:,i));
+            min_x = min(dataset_X(:,i));
+            max_tg = (max_y - min_y) / (max_x - min_x);
+            lb_hyp.mean(i) = -5 * max_tg;
+            ub_hyp.mean(i) = 5 * max_tg;
+          end
         end
         lb_hyp.mean = min(lb_hyp.mean, startHyp.mean);
         ub_hyp.mean = max(ub_hyp.mean, startHyp.mean);
