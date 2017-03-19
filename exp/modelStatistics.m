@@ -66,8 +66,14 @@ function [rdeTable, mseTable] = modelStatistics(modelFolders, modelOpts, functio
             data = load(fileName);
           end
           [~, instanceIndices] = ismember(data.instances, instances);
-          valuesRDE(rowIndex, columnIndex) = mean(data.stats.rde(instanceIndices,snapshot));
-          valuesMSE(rowIndex, columnIndex) = mean(data.stats.mse(instanceIndices,snapshot));
+          if (isempty(instanceIndices))
+            valuesRDE(rowIndex, columnIndex) = mean(data.stats.rde(instanceIndices,snapshot));
+            valuesMSE(rowIndex, columnIndex) = mean(data.stats.mse(instanceIndices,snapshot));
+          else
+            warning('instanceIndices are empty.');
+            valuesRDE(rowIndex, columnIndex) = NaN;
+            valuesMSE(rowIndex, columnIndex) = NaN;
+          end  
           columnIndex = columnIndex+1;
         end
       end
@@ -75,15 +81,13 @@ function [rdeTable, mseTable] = modelStatistics(modelFolders, modelOpts, functio
       columnIndex = 1;
     end
   end
-  rdeTable = table(valuesRDE);
-  rdeTable.Properties.VariableNames = columnsNames;
+  rdeTable = cell2table(valuesRDE, 'VariableNames',columnsNames);
   rdeTable.Properties.RowNames = rowsNames;
   disp(rdeTable);
-  mseTable = table(valuesMSE);
+  mseTable = cell2table(valuesMSE, 'VariableNames',columnsNames);
   mseTable.Properties.VariableNames = columnsNames;
   mseTable.Properties.RowNames = rowsNames;
   disp(mseTable);
-  
 end
 
 function hash = modelHash(modelOptions)
