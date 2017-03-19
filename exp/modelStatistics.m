@@ -23,7 +23,7 @@ function [rdeTable, mseTable] = modelStatistics(modelFolders, modelOpts, functio
   if (~exist('dimensions', 'var'))
     dimensions = 2; end
   if (~exist('instances', 'var'))
-    instances = 1:5; end
+    instances = [1:5, 41:50]; end
   if (~exist('snapshots', 'var'))
     snapshots = [1 3 9]; end
 
@@ -45,8 +45,8 @@ function [rdeTable, mseTable] = modelStatistics(modelFolders, modelOpts, functio
       cellIndex = cellIndex+1;
     end
   end
-  valuesRDE = NaN(rowsCount, columnsCount);
-  valuesMSE = NaN(rowsCount, columnsCount);
+  valuesRDE = cell(rowsCount, columnsCount);
+  valuesMSE = cell(rowsCount, columnsCount);
   
   rowIndex = 1;
   columnIndex = 1;
@@ -66,13 +66,14 @@ function [rdeTable, mseTable] = modelStatistics(modelFolders, modelOpts, functio
             data = load(fileName);
           end
           [~, instanceIndices] = ismember(data.instances, instances);
-          if (isempty(instanceIndices))
-            valuesRDE(rowIndex, columnIndex) = mean(data.stats.rde(instanceIndices,snapshot));
-            valuesMSE(rowIndex, columnIndex) = mean(data.stats.mse(instanceIndices,snapshot));
+          nonZeroInstanceIndices = instanceIndices(instanceIndices>0);
+          if (~isempty(nonZeroInstanceIndices))
+            valuesRDE{rowIndex, columnIndex} = mean(data.stats.rde(nonZeroInstanceIndices,snapshot));
+            valuesMSE{rowIndex, columnIndex} = mean(data.stats.mse(nonZeroInstanceIndices,snapshot));
           else
             warning('instanceIndices are empty.');
-            valuesRDE(rowIndex, columnIndex) = NaN;
-            valuesMSE(rowIndex, columnIndex) = NaN;
+            valuesRDE{rowIndex, columnIndex} = NaN;
+            valuesMSE{rowIndex, columnIndex} = NaN;
           end  
           columnIndex = columnIndex+1;
         end
@@ -83,10 +84,12 @@ function [rdeTable, mseTable] = modelStatistics(modelFolders, modelOpts, functio
   end
   rdeTable = cell2table(valuesRDE, 'VariableNames',columnsNames);
   rdeTable.Properties.RowNames = rowsNames;
+  disp('RDE Table');
   disp(rdeTable);
   mseTable = cell2table(valuesMSE, 'VariableNames',columnsNames);
   mseTable.Properties.VariableNames = columnsNames;
   mseTable.Properties.RowNames = rowsNames;
+  disp('MSE Table');
   disp(mseTable);
 end
 
