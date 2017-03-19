@@ -63,7 +63,8 @@ defModel_options = combineFieldValues(defModelOptions);
 models1_options  = combineFieldValues(models1);
 
 % Combine default options and full factorial design
-modelOptions     = [defModel_options; models1_options];
+%modelOptions     = [defModel_options; models1_options];
+modelOptions = models1_options;
 
 %% create testing dataset
 %ds = modelTestSets('exp_doubleEC_21_log15', func, dims, instances, opts);
