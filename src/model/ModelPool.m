@@ -13,7 +13,7 @@ classdef ModelPool < Model
     transformCoordinates  % transform X-space
     stateVariables        % variables needed for sampling new points as CMA-ES do
     sampleOpts            % options and settings for the CMA-ES sampling
-    
+
     % GpModel specific fields
     stdY                  % standard deviation of Y in training set, for normalizing output
     options
@@ -24,14 +24,14 @@ classdef ModelPool < Model
     infFcn
     nErrors
     trainLikelihood
-    
+
     % Dimensionality-reduction specific fields
     dimReduction          % Reduce dimensionality for model by eigenvectors
     % of covatiance matrix in percentage
     reductionMatrix       % Matrix used for dimensionality reduction
-    
+
     % ModelPool specific properties
-    
+
     modelPoolOptions
     archive
     modelsCount           % number of models in the modelPool
@@ -40,7 +40,7 @@ classdef ModelPool < Model
     isModelTrained        % 2D array, 0 if model at this position in models property is trained, 1 otherwise
     bestModelIndex
     bestModelsHistory     % how many times has been each model chosen as the best one
-    bestModelSelection    % which criterium will be used to select which model is the best 
+    bestModelSelection    % which criterium will be used to select which model is the best
                           %(mse/mae/rdeAll/rdeOrig/likelihood)
     choosingCriterium     % values of calculated criterium (mse/mae/...) for each model
     retrainPeriod
@@ -48,18 +48,18 @@ classdef ModelPool < Model
     xMean
     minTrainedModelsPercentilForModelChoice % if percentile of oldest models that are trained
                                             % drops below this value, we try newer generations of models
-    maxGenerationShiftForModelChoice  % stops trying to find trained generation 
-                                      % and switches to likelihood after this value of searched generations                                
+    maxGenerationShiftForModelChoice  % stops trying to find trained generation
+                                      % and switches to likelihood after this value of searched generations
   end
-  
+
   methods (Access = public)
     function obj = ModelPool(modelOptions, xMean)
       obj.modelPoolOptions = modelOptions;
       obj.xMean = xMean;
       obj.modelsCount = length(modelOptions.parameterSets);
       assert(obj.modelsCount ~= 0, 'ModelPool(): No model provided!');
-      
-      if (strcmpi(obj.bestModelSelection, 'likelihood')) 
+
+      if (strcmpi(obj.bestModelSelection, 'likelihood'))
         % likelihood selection does not need older models
         obj.historyLength = 0;
       else
@@ -75,7 +75,7 @@ classdef ModelPool < Model
           obj.maxGenerationShiftForModelChoice = obj.historyLength - 2;
         end
       end
-      
+
       obj.retrainPeriod = defopts(modelOptions, 'retrainPeriod', 1);
       obj.models = cell(obj.modelsCount,obj.historyLength+1);
       obj.isModelTrained = false(obj.modelsCount,obj.historyLength+1);
@@ -85,13 +85,13 @@ classdef ModelPool < Model
       obj.shiftY    = 0;
       obj.stdY      = 1;
       obj.bestModelSelection = defopts(modelOptions, 'bestModelSelection', 'mse');
-      
+
       % general model prediction options
       obj.predictionType = defopts(modelOptions, 'predictionType', 'fValues');
       obj.transformCoordinates = defopts(modelOptions, 'transformCoordinates', true);
       obj.dimReduction = defopts(modelOptions, 'dimReduction', 1);
       obj.options.normalizeY = defopts(modelOptions, 'normalizeY', true);
-      
+
       obj.nTrainData = Inf;
       for i=1:obj.modelsCount
         %create the models, calculate needed properties
@@ -101,22 +101,22 @@ classdef ModelPool < Model
         obj.nTrainData = min(obj.models{i,1}.getNTrainData(),obj.nTrainData);
       end
     end
-    
+
     function gpModel = createGpModel(obj, modelIndex, xMean)
       newModelOptions = obj.modelPoolOptions.parameterSets(modelIndex);
       newModelOptions.predictionType = obj.predictionType;
       newModelOptions.transformCoordinates = obj.transformCoordinates;
       newModelOptions.dimReduction = obj.dimReduction;
       newModelOptions.options.normalizeY = obj.options.normalizeY;
-      
+
       gpModel = ModelFactory.createModel('gp', newModelOptions, xMean);
-      
+
     end
-    
+
     function nData = getNTrainData(obj)
       nData = obj.nTrainData;
     end
-    
+
     function trained = isTrained(obj)
       % check whether the model chosen as the best in the newest generation is trained
       if (isempty(obj.isModelTrained(obj.bestModelIndex,1)))
@@ -125,12 +125,12 @@ classdef ModelPool < Model
         trained = obj.isModelTrained(obj.bestModelIndex,1);
       end
     end
-    
+
     function obj = trainModel(obj, ~, ~, ~, ~)
       % This function is empty because it is not needed, training is
       % done in train().
     end
-    
+
     function obj = train(obj, X, y, stateVariables, sampleOpts, archive, population)
       obj.archive = archive;
       obj.stateVariables = stateVariables;
@@ -138,16 +138,16 @@ classdef ModelPool < Model
       obj.xMean = stateVariables.xmean';
       generation = stateVariables.countiter;
       if (mod(generation,obj.retrainPeriod)==0)
-        
+
         trainedModelsCount=0;
         for i=1:obj.modelsCount
-          
+
           obj.models(i,:) = circshift(obj.models(i,:),[0,1]);
           obj.isModelTrained(i,:) = circshift(obj.isModelTrained(i,:),[0,1]);
           obj.isModelTrained(i,1) = 0;
           obj.models{i,1} = obj.createGpModel(i, obj.xMean);
           obj.models{i,1} = obj.models{i,1}.train(X, y, stateVariables, sampleOpts, obj.archive, population);
-          
+
           if (obj.models{i,1}.isTrained())
             trainedModelsCount = trainedModelsCount+1;
             obj.isModelTrained(i,1) = 1;
@@ -155,50 +155,50 @@ classdef ModelPool < Model
             obj.models{i,1}.trainGeneration = -1;
           end
         end
-        
+
         if (trainedModelsCount==0)
           warning('ModelPool.trainModel(): trainedModelsCount == 0');
         else
           obj.trainGeneration = generation;
-          
+
           [obj.bestModelIndex,obj.choosingCriterium] = obj.chooseBestModel(generation, population);
           obj.bestModelsHistory(obj.bestModelIndex) = obj.bestModelsHistory(obj.bestModelIndex)+1;
           obj = obj.copyPropertiesFromBestModel();
         end
       end
     end
-    
+
     function [y, sd2] = modelPredict(obj, X)
       [y,sd2] = obj.models{obj.bestModelIndex,1}.modelPredict(X);
     end
-    
+
     function X = getDataset_X(obj)
       X = obj.models{obj.bestModelIndex,1}.getDataset_X();
     end
-    
+
     function y = getDataset_y(obj)
       y = obj.models{obj.bestModelIndex,1}.getDataset_y();
     end
-    
+
   end
-  
+
   methods (Access = public)
     function [bestModelIndex, choosingCriterium] = chooseBestModel(obj, lastGeneration, population)
-      
+
       if (isempty(lastGeneration))
         lastGeneration = 0;
       end
-      
+
       ageOfTestedModels = -1;
       for i = obj.historyLength+1 : -1 : obj.historyLength+1 - obj.maxGenerationShiftForModelChoice;
         trainedPercentile = mean(obj.isModelTrained(:,i));
-        
+
         if (trainedPercentile >= obj.minTrainedModelsPercentilForModelChoice)
           ageOfTestedModels = i;
           break;
         end
       end
-      
+
       if (ageOfTestedModels == -1 || strcmpi(obj.modelPoolOptions.bestModelSelection,'likelihood'))
         choosingCriterium = obj.getLikelihood();
       else
@@ -225,7 +225,7 @@ classdef ModelPool < Model
         end
       end
     end
-    
+
     function obj = copyPropertiesFromBestModel(obj)
       obj.stdY = obj.models{obj.bestModelIndex,1}.stdY;
       obj.options = obj.models{obj.bestModelIndex,1}.options;
@@ -236,7 +236,7 @@ classdef ModelPool < Model
       obj.infFcn = obj.models{obj.bestModelIndex,1}.infFcn;
       obj.nErrors = obj.models{obj.bestModelIndex,1}.nErrors;
       obj.trainLikelihood = obj.models{obj.bestModelIndex,1}.trainLikelihood;
-      
+
       obj.shiftY = obj.models{obj.bestModelIndex,1}.shiftY;
       obj.trainSigma = obj.models{obj.bestModelIndex,1}.trainSigma;
       obj.trainBD = obj.models{obj.bestModelIndex,1}.trainBD;
@@ -246,7 +246,7 @@ classdef ModelPool < Model
       obj.stateVariables = obj.models{obj.bestModelIndex,1}.stateVariables;
       obj.sampleOpts = obj.models{obj.bestModelIndex,1}.sampleOpts;
     end
-    
+
     function choosingCriterium = getRdeOrig(obj, ageOfTestedModels, lastGeneration)
       choosingCriterium = Inf(obj.modelsCount,1);
       for i=1:obj.modelsCount
@@ -262,7 +262,7 @@ classdef ModelPool < Model
         end
       end
     end
-    
+
     function choosingCriterium = getRdeAll(obj, ageOfTestedModels, population, mu)
       choosingCriterium = Inf(obj.modelsCount,1);
       for modelIndex=1:obj.modelsCount
@@ -271,7 +271,7 @@ classdef ModelPool < Model
           if obj.isModelTrained(modelIndex,modelAge)
             testedModel = obj.models{modelIndex,modelAge};
             nextModel = obj.models{modelIndex,modelAge-1};
-            
+
             [~, xSample] = sampleCmaesNoFitness(...
               nextModel.trainSigma, ...
               nextModel.stateVariables.lambda, ...
@@ -297,10 +297,10 @@ classdef ModelPool < Model
         n = length(x);
         weights = 2.^(-(1:n)) ./ sum(2.^(-(1:n)));
         choosingCriterium(modelIndex) = weights(~isnan(x)) * x(~isnan(x)) ./ sum(weights(~isnan(x)));
-        
+
       end
     end
-    
+
     function choosingCriterium = getMse(obj, ageOfTestedModels, lastGeneration)
       choosingCriterium = Inf(obj.modelsCount,1);
       for i=1:obj.modelsCount
@@ -316,7 +316,7 @@ classdef ModelPool < Model
         end
       end
     end
-    
+
     function choosingCriterium = getMae(obj, ageOfTestedModels, lastGeneration)
       choosingCriterium = Inf(obj.modelsCount,1);
       for i=1:obj.modelsCount
@@ -332,16 +332,16 @@ classdef ModelPool < Model
         end
       end
     end
-    
+
     function choosingCriterium = getLikelihood(obj)
       choosingCriterium = Inf(obj.modelsCount,1);
       for i=1:obj.modelsCount
         choosingCriterium(i) = obj.models{i,1}.trainLikelihood;
       end
     end
-    
+
   end
-  
+
   methods (Static)
     function result = calculateTrainRange(percentile, dimension)
       result = chi2inv(percentile,dimension);

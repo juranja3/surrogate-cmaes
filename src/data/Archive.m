@@ -5,13 +5,13 @@ classdef Archive < handle
     y    = [];          % archive - dependent-space data
     gens = [];          % archive - generations of the data where they come from
   end
-  
+
   methods
     function obj = Archive(dimension)
       % constructor
       obj.dim = dimension;
     end
-    
+
     function obj = save(obj, X, y, generation)
       % save data (@X,@y) from @generation to the archive
       assert(size(X,1) == size(y,1), 'Archive.save: dimensions X and y mismatch.');
@@ -32,14 +32,14 @@ classdef Archive < handle
         obj.gens = [obj.gens; generation(isNotYetSaved)];
       end
     end
-    
+
     function [X, y] = getDataFromGenerations(obj, generations)
       % return data from generation(s) defined in scalar/vector @generations
       dataIdxs = ismember(obj.gens, generations);
       X = obj.X(dataIdxs, :);
       y = obj.y(dataIdxs);
     end
-    
+
     function [X, y, nData] = getDataNearPoint(obj, n, x, rangeSigma, sigma, BD)
       % returns up to 'n' data within distance of 'rangeSigma' along the point 'x'
       % using (sigma*BD)-metric
@@ -54,7 +54,7 @@ classdef Archive < handle
       if (nData == 0)
         return;
       end
-      
+
       % compute coordinates in the (sigma*BD)-basis
       xTransf = ( (sigma * BD) \ (obj.X - repmat(x,nData,1))' )';
 
@@ -62,7 +62,7 @@ classdef Archive < handle
       diff2 = sum(xTransf.^2, 2);
       isInRange = diff2 < (rangeSigma ^ 2);
       nData = sum(isInRange);
-      
+
       if (nData <= n  ||  n <= 0)
         X = obj.X(isInRange,:);
         y = obj.y(isInRange);
@@ -109,7 +109,7 @@ classdef Archive < handle
       if (nData > n)
         % there are more data than 'n'
         indicesToReturn = false(size(obj.y,1),1);
-        
+
         % compute coordinates in the (sigma*BD)-basis
         BDinv = inv(sigma*BD);
         % for each point from xInput:

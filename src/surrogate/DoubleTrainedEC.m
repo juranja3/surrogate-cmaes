@@ -98,11 +98,9 @@ classdef DoubleTrainedEC < EvolutionControl & Observable
 
       % prepare the final population to be returned to CMA-ES
       obj.pop = Population(lambda, dim);
-      if (isa(obj.model,'ModelPool'))
-        obj.newModel = obj.model;
-      else
-        obj.newModel = ModelFactory.createModel(obj.surrogateOpts.modelType, obj.surrogateOpts.modelOpts, obj.cmaesState.xmean');
-      end
+
+      obj.newModel = ModelFactory.createModel(obj.surrogateOpts.modelType, obj.surrogateOpts.modelOpts, obj.cmaesState.xmean', obj.model);
+
       if (isempty(obj.newModel))
         [obj, ok] = obj.tryOldModel();
         if (~ok)
@@ -143,7 +141,6 @@ classdef DoubleTrainedEC < EvolutionControl & Observable
         end
 
         % (first) model training
-        % TODO: obj.pop
         obj.newModel = obj.newModel.train(xTrain, yTrain, obj.cmaesState, sampleOpts, obj.archive, obj.pop);
         if (obj.newModel.isTrained())
           obj = obj.updateModelArchive(obj.newModel, obj.modelAge);
@@ -240,7 +237,6 @@ classdef DoubleTrainedEC < EvolutionControl & Observable
           % re-train the model again with the new original-evaluated points
           xTrain = [xTrain; xNewValid'];
           yTrain = [yTrain; yNew'];
-          % TODO: obj.pop
           obj.retrainedModel = obj.model.train(xTrain, yTrain, obj.cmaesState, sampleOpts, obj.archive, obj.pop);
 
           if (obj.useDoubleTraining && obj.retrainedModel.isTrained())

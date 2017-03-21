@@ -68,8 +68,6 @@ modelOptions = models1_options;
 
 %% create testing dataset
 %ds = modelTestSets('exp_doubleEC_21_log15', func, dims, instances, opts);
-ds = 'exp/experiments/exp_GPtest_01/dataset/DTS_005.mat';
-opts.dataset = ds;
 
 fprintf('== Summary of the testing assignment ==\n');
 fprintf('   # of models:  %d\n', length(modelOptions));
@@ -81,5 +79,5 @@ fprintf('=======================================\n');
 %% test chosen models
 modelFolders = testModels(modelOptions, opts, func, dims, instances);
 
-%% compare results
-modelStatistics(modelFolders, modelOptions, func, dims, instances)
+%% load and calculate results
+[rdeTable, mseTable, RDEs, MSEs] = modelStatistics(modelFolders, func, dims, instances);

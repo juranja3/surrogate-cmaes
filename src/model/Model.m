@@ -245,13 +245,13 @@ classdef (Abstract) Model
       end
 
     end
-    
+
     function obj = train(obj, X, y, stateVariables, sampleOpts, archive, population)
-      % train the model based on the data (X,y)
-      % if archive is passed and trainsetType is not 'parameters',
-      % X and y are ignored and new values for X, y are retrieved from archive
-      % according to the model settings
-      
+    % train the model based on the data (X,y)
+    % if archive is passed and trainsetType is not 'parameters',
+    % X and y are ignored and new values for X, y are retrieved from archive 
+    % according to the model settings
+
       xMean = stateVariables.xmean';
       generation = stateVariables.countiter;
       sigma = stateVariables.sigma;
@@ -260,13 +260,16 @@ classdef (Abstract) Model
       obj.sampleOpts = sampleOpts;
       obj.trainMean = xMean;
       obj.stateVariables = stateVariables;
-      
-      trainsetType = defopts(obj.options,'trainsetType','parameters');
+
+      trainsetType = defopts(obj.options, 'trainsetType', 'parameters');
+      obj.options.trainsetSizeMax = defopts(obj.options, 'trainsetSizeMax', 15*obj.dim);
+      obj.options.trainRange = defopts(obj.options, 'trainRange', 1);
       if (~strcmpi(trainsetType, 'parameters') && exist('archive','var'))
         [X, y] = obj.generateDataset(archive, population);
       end
+
       if (isempty(X))
-        obj.trainGeneration=-1;
+        obj.trainGeneration= - 1;
         warning('Model.train() - empty trainset. Considering the model as untrained.');
       else
         % minimal difference between minimal and maximal returned
@@ -274,7 +277,7 @@ classdef (Abstract) Model
         % constant response is mark of a badly trained model
         % and therefor it is marked as untrained
         MIN_RESPONSE_DIFFERENCE = min(1e-8, 0.05 * (max(y) - min(y)));
-        
+
         % transform input variables using Mahalanobis distance
         if obj.transformCoordinates
           % compute coordinates in the (sigma*BD)-basis
@@ -284,7 +287,7 @@ classdef (Abstract) Model
         else
           XTransf = X;
         end
-        
+
         % dimensionality reduction
         if (isprop(obj, 'dimReduction') && (obj.dimReduction ~= 1))
           cntDimension = ceil(obj.dim * obj.dimReduction);
@@ -297,9 +300,9 @@ classdef (Abstract) Model
         else
           XtransfReduce=XTransf;
         end
-        
+
         obj = trainModel(obj, XtransfReduce, y, xMean, generation);
-        
+
         if (obj.isTrained())
           % Test that we don't have a constant model
           [~, xTestValid] = sampleCmaesNoFitness(sigma, lambda, stateVariables, sampleOpts);
