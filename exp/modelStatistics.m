@@ -139,16 +139,20 @@ function [rdeTable, mseTable, RDEs, MSEs] = modelStatistics(modelFolders, functi
       end
     end
   end
-
+  
   rdeTable = cell2table(valuesRDE, 'VariableNames', colNames);
   rdeTable.Properties.RowNames = rowNames;
   disp('RDE Table');
   disp(rdeTable);
-
+  writetable(rdeTable, 'rdeTable.txt', 'WriteRowNames', true);
+  save('RDEs.mat','RDEs');
+  
   mseTable = cell2table(valuesMSE, 'VariableNames', colNames);
   mseTable.Properties.RowNames = rowNames;
   disp('MSE Table');
   disp(mseTable);
+  writetable(mseTable, 'mseTable.txt', 'WriteRowNames', true);
+  save('MSEs.mat','MSEs');
 end
 
 function [modelName, hash, FEs] = parseFolderName(dirName)
