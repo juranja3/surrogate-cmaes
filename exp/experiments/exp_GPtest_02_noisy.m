@@ -67,7 +67,7 @@ models1_options  = combineFieldValues(models1);
 modelOptions = models1_options;
 
 %% create testing dataset
-ds = modelTestSets('exp_doubleEC_21_log15_noisy', func, dims, instances, opts);
+%ds = modelTestSets('exp_doubleEC_21_log15_noisy', func, dims, instances, opts);
 
 fprintf('== Summary of the testing assignment ==\n');
 fprintf('   # of models:  %d\n', length(modelOptions));
