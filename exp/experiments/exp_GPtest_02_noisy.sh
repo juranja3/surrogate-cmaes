@@ -3,10 +3,10 @@
 # Job-submitting script for GP model testing
 
 # QUEUE = Metacentrum walltime (2h/4h/1d/2d/1w) -- queue will be decided accordingly
-export EXPID='exp_GPtest_01'
+export EXPID='exp_GPtest_02'
 
 # Enable this option for using Matlab MCR compilated binaries:
-# export useMCR=1
+export useMCR=1
 
 # CWD = Directory of this particular file
 CWD=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
@@ -44,20 +44,23 @@ subtask() {
 OPTS=""
 
 QUEUE="48:00:00"
-ID=49;
+ID=1;
 
-MATLAB_FCN="exp_GPtest_01"
+MATLAB_FCN="exp_GPtest_02_noisy"
 INST="[1 2 3 4 5 41 42 43 44 45 46 47 48 49 50]"
 
-DIM=10
-for i in `seq 1 24`; do
+DIM=2
+for i in `seq 101 106`; do
   FUNC=$i; subtask $ID
 done
 
-exit 0
+DIM=5
+for i in `seq 101 106`; do
+  FUNC=$i; subtask $ID
+done
 
 DIM=10
-for i in `seq 1 24`; do
+for i in `seq 101 106`; do
   FUNC=$i; subtask $ID
 done
 
