@@ -96,7 +96,7 @@ classdef ModelPool < Model
       for i=1:obj.modelsCount
         %create the models, calculate needed properties
         modelOptions = obj.modelPoolOptions.parameterSets(i);
-        obj.modelPoolOptions.parameterSets(i).calculatedTrainRange = ModelPool.calculateTrainRange(modelOptions.trainRange, obj.dim);
+        %obj.modelPoolOptions.parameterSets(i).calculatedTrainRange = ModelPool.calculateTrainRange(modelOptions.trainRange, obj.dim);
         obj.models{i,1} = obj.createGpModel(i, xMean);
         obj.nTrainData = min(obj.models{i,1}.getNTrainData(),obj.nTrainData);
       end
