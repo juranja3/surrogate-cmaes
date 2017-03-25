@@ -67,10 +67,27 @@ function [stats, models, y_models] = testOneModel(modelType, modelOpts, ds, nSna
       X_train = [];
       y_train = [];
     end
-
-    m = m.train(X_train, y_train, ds.cmaesStates{i}, ds.sampleOpts{i}, ...
+    
+    if (isa(m,'ModelPool'))
+      for j = m.historyLength:-1:1;
+        currentGen = i-j+1;
+        if (currentGen < 2)
+          fprintf('testOneModel: can''t train ModelPool, current gen is %d\n',currentGen);
+        else
+        thisPopulation = Population(lambda, dim);
+        thisPopulation = thisPopulation.addPoints(ds.testSetX{currentGen}', zeros(size(ds.testSetY{currentGen}')), ...
+        ds.testSetX{currentGen}', NaN(size(ds.testSetX{currentGen}')), 0);
+      
+        thisArchive = ds.archive.duplicate();
+        thisArchive = thisArchive.restrictToGenerations(1:(ds.generations(currentGen-1)));
+        m = m.train(X_train, y_train, ds.cmaesStates{currentGen}, ds.sampleOpts{currentGen}, ...
+                    thisArchive, thisPopulation);
+        end
+      end
+    else
+      m = m.train(X_train, y_train, ds.cmaesStates{i}, ds.sampleOpts{i}, ...
         thisArchive, thisPopulation);
-
+    end
     if m.isTrained()
       y = ds.testSetY{i};
       y_models{i} = m.predict(ds.testSetX{i});
