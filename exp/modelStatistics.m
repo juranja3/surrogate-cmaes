@@ -31,20 +31,17 @@ function [rdeTable, mseTable, RDEs, MSEs] = modelStatistics(modelFolders, functi
   assert(isnumeric(instances), '''instToTest'' has to be integer')
   assert(isnumeric(snapshots), '''instToTest'' has to be integer')
 
-  rowsCount = length(modelFolders)*length(snapshots);
-  columnsCount = length(functions)*length(dimensions);
-
   % prepare resulting cell arrays
   RDEs = cell(length(modelFolders), length(functions), length(dimensions));
   MSEs = cell(length(modelFolders), length(functions), length(dimensions));
   isTrained = cell(length(modelFolders), length(functions), length(dimensions));
-
+  modelOpts = [];
   % {
   % iterate through all specified models / dimensions / functions
   for i_model = 1:length(modelFolders)
     [modelName, hash] = parseFolderName(modelFolders{i_model});
     fprintf('Model %d [%s_%s]... ', i_model, modelName, hash);
-
+    
     for i_dim = 1:length(dimensions)
       dim = dimensions(i_dim);
       fprintf('%dD: ', dim);
@@ -62,6 +59,9 @@ function [rdeTable, mseTable, RDEs, MSEs] = modelStatistics(modelFolders, functi
         else
           data = load(fileName);
           data_instances = ismember(data.instances, instances);
+          if (isempty(modelOpts))
+            modelOpts = data.modelOptions;
+          end
           if (any(data_instances))
 
             % save the statistics into respective resulting cell arrays
@@ -89,10 +89,19 @@ function [rdeTable, mseTable, RDEs, MSEs] = modelStatistics(modelFolders, functi
   % }
   % load('/tmp/stats.mat');
 
+  rowsCount = length(modelFolders)*length(snapshots);
+  columnsCount = length(functions)*length(dimensions);
+  
   valuesRDE = cell(rowsCount, columnsCount);
   valuesMSE = cell(rowsCount, columnsCount);
   colNames  = cell(1, columnsCount);
   rowNames  = cell(1, rowsCount);
+  trainsetType = cell(rowsCount, 1);
+  trainsetSizeMax = cell(rowsCount, 1);
+  trainRange = cell(rowsCount, 1);
+  covFcn = cell(rowsCount, 1);
+  meanFcn = cell(rowsCount, 1);
+  
   row = 0;
 
   % set-up a new table row for each model, snapshot and dimension
@@ -107,7 +116,11 @@ function [rdeTable, mseTable, RDEs, MSEs] = modelStatistics(modelFolders, functi
 
         row = row + 1;
         rowNames{row} = sprintf('%s_%s_%dD_S%d', modelName, hash, dim, snapshot);
-
+        trainsetType{row} = modelOpts{i_model}.trainsetType;
+        trainsetSizeMax{row} = modelOpts{i_model}.trainsetSizeMax;
+        trainRange{row} = modelOpts{i_model}.trainRange;
+        covFcn{row} = modelOpts{i_model}.covFcn;
+        meanFcn{row} = modelOpts{i_model}.meanFcn;
         % save current dimension and snapshot into the first two columns
         colNames(1:2) = {'dim', 'snapshot'};
         valuesRDE(row, 1:2) = {dim, snapshot};
@@ -142,6 +155,9 @@ function [rdeTable, mseTable, RDEs, MSEs] = modelStatistics(modelFolders, functi
   
   rdeTable = cell2table(valuesRDE, 'VariableNames', colNames);
   rdeTable.Properties.RowNames = rowNames;
+  modelOptsTable=cell2table([trainsetType, trainsetSizeMax, trainRange, covFcn, meanFcn], ...
+    'VariableNames', {'trainsetType', 'trainsetSizeMax', 'trainRange', 'covFcn', 'meanFcn'});
+  rdeTable = [modelOptsTable, rdeTable];
   disp('RDE Table');
   disp(rdeTable);
   writetable(rdeTable, 'rdeTable.txt', 'WriteRowNames', true);
@@ -149,6 +165,7 @@ function [rdeTable, mseTable, RDEs, MSEs] = modelStatistics(modelFolders, functi
   
   mseTable = cell2table(valuesMSE, 'VariableNames', colNames);
   mseTable.Properties.RowNames = rowNames;
+  mseTable = [modelOptsTable, mseTable];
   disp('MSE Table');
   disp(mseTable);
   writetable(mseTable, 'mseTable.txt', 'WriteRowNames', true);
