@@ -1,5 +1,5 @@
 #!/bin/sh
-#PBS -l select=1:ncpus=1:mem=1gb:scratch_local=1gb
+#PBS -l select=1:ncpus=1:mem=1500mb:scratch_local=1gb
 
 # it suppose the following variables set:
 #
@@ -11,7 +11,7 @@
 #   EXPPATH_SHORT  -- usually $APPROOT/exp/experiments
 
 # MATLAB Runtime environment
-export LD_LIBRARY_PATH=/storage/plzen1/home/bajeluk/bin/mcr_2016b/v91/runtime/glnxa64:/storage/plzen1/home/bajeluk/bin/mcr_2016b/v91/bin/glnxa64:/storage/plzen1/home/bajeluk/bin/mcr_2016b/v91/sys/os/glnxa64:/storage/plzen1/home/bajeluk/bin/mcr_2016a/v901/runtime/glnxa64:/storage/plzen1/home/bajeluk/bin/mcr_2016a/v901/bin/glnxa64:/storage/plzen1/home/bajeluk/bin/mcr_2016a/v901/sys/os/glnxa64:$LD_LIBRARY_PATH
+# setting LD_LIBRARY_PATH moved into bash_settings.sh
 
 # Load global settings and variables
 . $EXPPATH_SHORT/../bash_settings.sh
@@ -34,6 +34,9 @@ fi
 if [ -z "$EXPPATH_SHORT" ] ; then
   echo "Error: directory with the experiment is not known"; exit 1
 fi
+
+# replace critical characters in $OPTS: '|' with ',' and "%" with "'"
+OPTS=`echo $OPTS | tr '%|' "',"`
 
 cd "$EXPPATH_SHORT/../.."
 cp "$DATASET" "$SCRATCHDIR"
