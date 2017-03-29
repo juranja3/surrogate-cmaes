@@ -1,66 +1,87 @@
 #!/bin/bash
 #
-# Job-submitting script for GP model testing
+# Job-submitting experiment example (submitting the all considered models
+# in 2D).
+# The resulting experiment .sh file is expected to be located in exp/experiments/
+#
+# usage: $ exp/exp_TESTMODELS_EXPERIMENT.sh
+#
+# options:
+#   -n | --dry-run      no submittion will happen, only print what should be done
+#
+# see also:
+#   exp/bash_settings.sh
+#   exp/metacentrum_testmodels_common.sh 
 
-# QUEUE = Metacentrum walltime (2h/4h/1d/2d/1w) -- queue will be decided accordingly
-export EXPID='exp_GPtest_02'
+export EXPID='exp_GPtest02_noisy'
 
 # Enable this option for using Matlab MCR compilated binaries:
 export useMCR=1
 
-# CWD = Directory of this particular file
+# !!! THIS HAS TO BE HERE !!!
+#     vvvvvvvvvvvvvvvvvvv
 CWD=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 . $CWD/../bash_settings.sh
-export EXPPATH_SHORT="$CWD"
+. $CWD/../metacentrum_testmodels_common.sh
+#     ^^^^^^^^^^^^^^^^^^^
+# !!! THIS HAS TO BE HERE !!!
 
-export ID
-export DIM
-export FUNC
-export INST
-export OPTS
-export MATLAB_FCN
+# job submittion can be done via one of the two bash functions:
+#
+# (a) subtask [JOBNAME_SUFFIX]
+#
+#     submits a job with current-set $ID, $DIM, $FUNC, $INST and $OPTS
+#
+#
+# (b) submit_sequence LOW_IDX STEP HIGH_IDX
+#
+#     call subtask() with 'modelOptionsIndices' set to a small
+#     numbers of model-settings;
+#     it submits a job for every $2 consecutive modelOptions' indices
+#
+#     e.g.: submit 11 4 22
+#     submits jobs for the following modelOption indices:
+#       - 11:14
+#       - 15:18
+#       - 19:22
+#
+#     Important: the HIGH_IDX should be the equal to (k*LOW_IDX) - 1
+#                for some k
 
-subtask() {
-  # make sure that these variables will be exported
-  export EXPID
-  export EXPPATH_SHORT
-  export ID
-  export DIM
-  export INST
-  export OPTS
-  export FUNC=`echo $FUNC | tr '\n' ' '`
-  if [ "$useMCR" == 1 ]; then
-    echo "MCR binary submit: ID=$ID : DIM=$DIM : FUNC=$FUNC : INST=$INST"
-    qsub -N "${EXPID}__${ID}" -l "walltime=$QUEUE" -v FUNC,DIM,INST,OPTS,EXPID,EXPPATH_SHORT $EXPPATH_SHORT/../modelTesting_binary_metajob.sh
-  else
-    echo ID=$ID : DIM=$DIM : FUNC=$FUNC : INST=$INST : MATLAB_FCN=$MATLAB_FCN
-    # submission on Metacentrum
-    # TODO: convert into the new PBS-Pro task scheduler
-    qsub -N "${EXPID}__$1" -l "walltime=$QUEUE" -v FUNC,DIM,INST,MATLAB_FCN,EXPID,EXPPATH_SHORT $EXPPATH_SHORT/../modelTesting_metajob.sh && echo "submitted ok."
-  fi
-  ID=$((ID+1))
-}
 
+# critical characters has to be replaced in $OPTS:
+# '|' with ',' and "%" with "'"
 OPTS=""
 
 QUEUE="48:00:00"
-ID=1;
-
-MATLAB_FCN="exp_GPtest_02_noisy"
 INST="[1 2 3 4 5 41 42 43 44 45 46 47 48 49 50]"
 
 DIM=2
-for i in `seq 101 106`; do
-  FUNC=$i; subtask $ID
+ID=1
+for FUNC in `seq 101 106`; do
+  subtask
 done
 
 DIM=5
-for i in `seq 101 106`; do
-  FUNC=$i; subtask $ID
+for FUNC in `seq 101 106`; do
+  subtask
 done
 
 DIM=10
-for i in `seq 101 106`; do
-  FUNC=$i; subtask $ID
+for FUNC in `seq 101 106`; do
+  subtask
 done
 
+
+exit 0
+
+
+# Example of using submit_sequence
+#
+# # f1
+# FUNC=1
+# QUEUE="4:00:00"
+# ID=490
+# submit_sequence 146 1 146
+# submit_sequence 147 2 170
+# submit_sequence 217 2 256
