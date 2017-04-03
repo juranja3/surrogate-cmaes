@@ -33,6 +33,9 @@ function ds = modelTestSets(exp_id, fun, dim, inst, opts)
   opts.inputExp_id   = exp_id;
   % The number of generated datasets per one CMA-ES run
   opts.nSnapshotsPerRun = defopts(opts, 'nSnapshotsPerRun', 10);
+  % dataset for ModelPool testing needs additional data
+  opts.isForModelPool = defopts(opts, 'isForModelPool', false);
+  opts.nPreviousGenerations = defopts(opts, 'nPreviousGenerations', 0);
 
   % set random seed due to reproducibility of default dataset
   rng(opts.maxEval)
@@ -121,7 +124,7 @@ function ds = modelTestSets(exp_id, fun, dim, inst, opts)
 
       % load dataset from saved modellog/cmaes_out of the corresponding instance
       ds_actual = datasetFromInstances(opts, opts.nSnapshotsPerRun, ...
-          fun(fi), dim(di), inst(~instancesDone), id);
+          fun(fi), dim(di), inst(~instancesDone), id, opts.isForModelPool, opts.nPreviousGenerations);
         
       ds(fi, di, ~instancesDone) = ds_actual;
 
