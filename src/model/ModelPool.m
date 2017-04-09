@@ -310,7 +310,7 @@ classdef ModelPool < Model
           if (obj.isModelTrained(i,ageOfTestedModels))
             [yModel, ~] = obj.models{i, ageOfTestedModels}.modelPredict(X);
             if (size(yArchive)==size(yModel))
-              choosingCriterium(i) = sum((yModel - yArchive).^2)/size(yArchive);
+              choosingCriterium(i) = sum((yModel - yArchive).^2)/length(yArchive);
             end
           end
         end
@@ -326,7 +326,7 @@ classdef ModelPool < Model
           if (obj.isModelTrained(i,ageOfTestedModels))
             [yModel, ~] = obj.models{i,ageOfTestedModels}.modelPredict(X);
             if (size(yArchive)==size(yModel))
-              choosingCriterium(i) = sum(abs(yModel - yArchive))/size(yArchive);
+              choosingCriterium(i) = sum(abs(yModel - yArchive))/length(yArchive);
             end
           end
         end
