@@ -57,9 +57,12 @@ QUEUE="96:00:00"
 INST="[1 2 3 4 5 41 42 43 44 45 46 47 48 49 50]"
 
 DIM=2
-ID=1
+# ID=1
 for FUNC in `seq 1 24`; do
-  subtask
+  # multiply ID's
+  ID=$((FUNC*100+1))
+  # submit one job per one model settings
+  submit_sequence 1 1 24
 done
 
 exit 0
