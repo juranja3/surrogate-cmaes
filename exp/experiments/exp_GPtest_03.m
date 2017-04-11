@@ -17,6 +17,5 @@ modelOptions.trainsetType    = { 'nearestToPopulation' };
 modelOptions.trainRange      = { 0.999 };
 modelOptions.trainsetSizeMax = { '10*dim' };
 modelOptions.meanFcn         = { 'meanConst' };
-modelOptions.covFcn          = { '{@covSEiso}', '{@covSEard}', ...
-                            '{@covMaterniso, 5}', '{@covMaterniso, 3}' };
+modelOptions.covFcn          = { '{@covSEiso}', '{@covSEard}', '{@covMaterniso, 5}', '{@covMaterniso, 3}' };
 

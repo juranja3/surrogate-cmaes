@@ -13,7 +13,7 @@
 #   exp/bash_settings.sh
 #   exp/metacentrum_testmodels_common.sh 
 
-export EXPID='exp_MPtest_01_rde'
+export EXPID='exp_MPtest_simple'
 
 # Enable this option for using Matlab MCR compilated binaries:
 export useMCR=1
@@ -58,7 +58,7 @@ INST="[1 2 3 4 5 41 42 43 44 45 46 47 48 49 50]"
 
 DIM=2
 ID=1
-for FUNC in `seq 1 24`; do
+for FUNC in `seq 1 1`; do
   subtask
 done
 
