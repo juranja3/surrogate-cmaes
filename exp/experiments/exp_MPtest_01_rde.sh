@@ -53,7 +53,7 @@ CWD=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 # '|' with ',' and "%" with "'"
 OPTS=""
 
-QUEUE="96:00:00"
+QUEUE="24:00:00"
 INST="[1 2 3 4 5 41 42 43 44 45 46 47 48 49 50]"
 
 DIM=2
