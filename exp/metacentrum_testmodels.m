@@ -131,7 +131,7 @@ function status = metacentrum_testmodels(exp_id, exppath_short, func_str, dim_st
   modelFolders = testModels(modelOptions_fullfact, opts, func, dims, instances);
 
   %% load and calculate results
-  [rdeTable, mseTable, RDEs, MSEs] = modelStatistics(modelFolders, func, dims, instances, [1 3 9], exp_id);
+  [rdeTable, mseTable, RDEs, MSEs] = modelStatistics(modelFolders, func, dims, instances, [3 5 9], exp_id);
 
   save(fullfile(opts.exppath, 'stats.mat'), 'modelFolders', 'rdeTable', 'mseTable', 'RDEs', 'MSEs');
 

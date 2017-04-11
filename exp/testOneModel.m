@@ -36,6 +36,12 @@ function [stats, models, y_models] = testOneModel(modelType, modelOpts, ds, nSna
 
   % cycle through all snapshots (usually 10)
   for i = 1:nSnapshots
+    if ((i~=3) && (i~=5) && (i~=9))
+      fprintf('Skipping snapshot %d\n',i);
+      continue;
+    else
+      fprintf('Calculating snapshot %d\n',i);
+    end
     [lambda, dim] = size(ds.testSetX{i});
 
     % prepare archive for this snapshot one generation shorter

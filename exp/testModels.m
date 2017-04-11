@@ -125,7 +125,7 @@ function modelFolder = testModels(modelOptions, opts, funcToTest, dimsToTest, in
           fprintf('Some instances already calculated in %s.\n', modelFile);
           fprintf('Starting from inst. # %d.\n', instToTest(startInstanceIdx));
           stats = oldResults.stats;
-          models = oldResults.models;
+          %models = oldResults.models;
           y_models = oldResults.y_models;
         else
           % (re-)calculate the results
@@ -139,7 +139,7 @@ function modelFolder = testModels(modelOptions, opts, funcToTest, dimsToTest, in
           for st = 1:length(opts.statistics)
             stats.(opts.statistics{st}) = NaN(length(instToTest), dataNSnapshots);
           end
-          models   = cell(length(instToTest), dataNSnapshots);
+          %models   = cell(length(instToTest), dataNSnapshots);
           y_models = cell(length(instToTest), dataNSnapshots);
         end
 
@@ -148,10 +148,10 @@ function modelFolder = testModels(modelOptions, opts, funcToTest, dimsToTest, in
           inst = instToTest(ii);
           i_data = find(inst == dataInst, 1);
           fprintf('-- instance %2d --\n', inst);
-
+          
           % train & test the model on the 'dataNSnapshots' datasets
           % from the current instance
-          [new_stats, models(ii, :), y_models(ii, :)] = ...
+          [new_stats, ~, y_models(ii, :)] = ...
               testOneModel(modelType{m}, modelOptions{m}, ...
               data{f_data, d_data, i_data}, dataNSnapshots, opts);
 
@@ -163,7 +163,7 @@ function modelFolder = testModels(modelOptions, opts, funcToTest, dimsToTest, in
 
           % save results of the so-far calculated instances
           instances = instToTest(1:ii);
-          save(modelFile, 'stats', 'models', 'y_models', 'instances', 'modelOptions', 'fun', 'dim')
+          save(modelFile, 'stats', 'y_models', 'instances', 'modelOptions', 'fun', 'dim')
         end  % instance loop
       end  % model loop
     end  % function loop
