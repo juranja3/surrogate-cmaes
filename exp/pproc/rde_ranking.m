@@ -21,7 +21,9 @@ for dim_i = 1:length(dimensions)
   modelRanks = zeros(nSettings, length(functions)*length(snapshots));
   nTrained   = zeros(nSettings, length(functions)*length(snapshots));
   dimId = find(dim == dimensions, 1);
-
+  
+  functions(functions>100) = functions(functions>100)-100; % for noisy functions
+  
   for func = functions
     for snp_i = 1:length(snapshots)
       snp = snapshots(snp_i);
