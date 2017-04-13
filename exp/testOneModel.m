@@ -36,7 +36,7 @@ function [stats, models, y_models] = testOneModel(modelType, modelOpts, ds, nSna
 
   % cycle through all snapshots (usually 10)
   for i = 1:nSnapshots
-    if ((i~=3) && (i~=5) && (i~=9))
+    if ((i~=3) && (i~=9))
       fprintf('Skipping snapshot %d\n',i);
       continue;
     else
