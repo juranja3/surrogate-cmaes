@@ -5,8 +5,7 @@
 
 defaultParameterSets = struct( ...
   'trainAlgorithm', { {'fmincon'} }, ...
-  'hyp',            { {struct('lik', log(0.01), 'cov', log([0.5; 2]))} }, ...
-  'nBestPoints',    { { 0 } } );
+  'hyp',            { {struct('lik', log(0.01), 'cov', log([0.5; 2]))} });
 
 bestSettings = cell(3,1);
 aggMSE_nHeaderCols = 3;
