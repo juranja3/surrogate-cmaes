@@ -13,7 +13,7 @@
 #   exp/bash_settings.sh
 #   exp/metacentrum_testmodels_common.sh 
 
-export EXPID='exp_MPtest_02_rde'
+export EXPID='exp_MPtest_04_mse'
 
 # Enable this option for using Matlab MCR compilated binaries:
 export useMCR=1
