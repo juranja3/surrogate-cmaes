@@ -105,6 +105,8 @@ function [aggRDE_table, aggMSE_table, RDEs, MSEs] = modelStatistics(modelFolders
                 folderModelOptions{i_model} = getThisModelOption(dirName, data.modelOptions);
               elseif (isstruct(data.modelOptions))
                 folderModelOptions{i_model} = data.modelOptions;
+              elseif (isstruct(data.modelOptions{1}))
+                folderModelOptions{i_model} = data.modelOptions{1};
               else
                 warning('data.modelOptions are mssing or have wrong format');
               end
@@ -116,12 +118,12 @@ function [aggRDE_table, aggMSE_table, RDEs, MSEs] = modelStatistics(modelFolders
               RDEs{i_model, i_func, i_dim} = data.stats.rde(data_instances, snapshots);
               MSEs{i_model, i_func, i_dim} = data.stats.mse(data_instances, snapshots);
               MAEs{i_model, i_func, i_dim} = data.stats.mae(data_instances, snapshots);
-              %if (isfield(data, 'models'))
-              %  isTrained{i_model, i_func, i_dim} = cellfun( ...
-              %      @(m) m.isTrained(), data.models(data_instances, snapshots) );
-              %else
+              if (isfield(data, 'models'))
+                isTrained{i_model, i_func, i_dim} = cellfun( ...
+                    @(m) m.isTrained(), data.models(data_instances, snapshots) );
+              else
                 isTrained{i_model, i_func, i_dim} = ~ isnan(MSEs{i_model, i_func, i_dim});
-              %end
+              end
 
             else
               warning('There''s no instance with any results for %s_%s, f%d in %dD', ...
