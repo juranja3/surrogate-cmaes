@@ -233,7 +233,7 @@ classdef ModelPool < Model
       % choose the best model from trained ones according to the choosing criterium
       switch lower(obj.bestModelSelection)
         case {'poiavg', 'poimax', 'eiavg', 'eimax'}
-          [maxValue, bestModelIndex] = min(choosingCriterium(obj.isModelTrained(:,1)));
+          [maxValue, bestModelIndex] = max(choosingCriterium(obj.isModelTrained(:,1)));
           if (maxValue<=0)
             warning('ModelPool.chooseBestModel: Max value of best model selection is not positive.');
           end
