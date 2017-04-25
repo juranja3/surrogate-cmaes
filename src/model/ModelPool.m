@@ -382,8 +382,8 @@ classdef ModelPool < Model
     
     function choosingCriterium = getEICriterium(obj, useMean, population)
       choosingCriterium = zeros(obj.modelsCount,1);
+      X = population.x';
       for i=1:obj.modelsCount
-        X = population.x';
         [y, sd2] = obj.models{i,1}.predict(X); 
         fmin = min(obj.models{i,1}.getDataset_y());
         output = getEI(X, y, sd2, fmin);
