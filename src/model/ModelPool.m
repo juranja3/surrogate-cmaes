@@ -59,8 +59,12 @@ classdef ModelPool < Model
       obj.modelsCount = length(modelOptions.parameterSets);
       assert(obj.modelsCount ~= 0, 'ModelPool(): No model provided!');
 
-      if (strcmpi(obj.bestModelSelection, 'likelihood'))
-        % likelihood selection does not need older models
+      if (strcmpi(obj.bestModelSelection, 'likelihood')...
+         || strcmpi(obj.bestModelSelection, 'poiavg')...
+         || strcmpi(obj.bestModelSelection, 'poimax')...
+         || strcmpi(obj.bestModelSelection, 'eiavg')...
+         || strcmpi(obj.bestModelSelection, 'eimax'))
+        % these selections do not need older models
         obj.historyLength = 0;
       else
         obj.historyLength = defopts(modelOptions, 'historyLength', 4);
@@ -198,7 +202,10 @@ classdef ModelPool < Model
           break;
         end
       end
-
+      switch lower(obj.bestModelSelection)
+        case {'poiavg', 'poimax', 'eiavg', 'eimax'}
+          ageOfTestedModels = 1; % poi/ei use only 1 generation of models
+      end
       if (ageOfTestedModels == -1 || strcmpi(obj.modelPoolOptions.bestModelSelection,'likelihood'))
         choosingCriterium = obj.getLikelihood();
       else
@@ -211,18 +218,34 @@ classdef ModelPool < Model
             choosingCriterium = obj.getMse(ageOfTestedModels, lastGeneration);
           case 'mae'
             choosingCriterium = obj.getMae(ageOfTestedModels, lastGeneration);
+          case 'poiavg'
+            choosingCriterium = obj.getPOICriterium(true, population);
+          case 'poimax'
+            choosingCriterium = obj.getPOICriterium(false, population);
+          case 'eiavg'
+            choosingCriterium = obj.getEICriterium(true, population);
+          case 'eimax'
+            choosingCriterium = obj.getEICriterium(false, population);
           otherwise
             error(['ModelPool.chooseBestModel: ' obj.modelPoolOptions.bestModelSelection ' -- no such option available']);
         end
       end
       % choose the best model from trained ones according to the choosing criterium
-      [minValue,bestModelIndex] = min(choosingCriterium(obj.isModelTrained(:,1)));
-      if minValue==Inf
-        bestModelIndex = 1;
-        if (mean(obj.isModelTrained(:,i))>0)
-          warning('ModelPool.chooseBestModel: value of minimum is Inf, ageOfTestedModels %d, percentile of trainedModels %d', ...
-            ageOfTestedModels, mean(obj.isModelTrained(:,i)));
-        end
+      switch lower(obj.bestModelSelection)
+        case {'poiavg', 'poimax', 'eiavg', 'eimax'}
+          [maxValue, bestModelIndex] = min(choosingCriterium(obj.isModelTrained(:,1)));
+          if (maxValue<=0)
+            warning('ModelPool.chooseBestModel: Max value of best model selection is not positive.');
+          end
+        otherwise
+          [minValue,bestModelIndex] = min(choosingCriterium(obj.isModelTrained(:,1)));
+          if minValue==Inf
+            bestModelIndex = 1;
+            if (mean(obj.isModelTrained(:,i))>0)
+              warning('ModelPool.chooseBestModel: value of minimum is Inf, ageOfTestedModels %d, percentile of trainedModels %d', ...
+                ageOfTestedModels, mean(obj.isModelTrained(:,i)));
+            end
+          end
       end
     end
 
@@ -337,6 +360,38 @@ classdef ModelPool < Model
       choosingCriterium = Inf(obj.modelsCount,1);
       for i=1:obj.modelsCount
         choosingCriterium(i) = obj.models{i,1}.trainLikelihood;
+      end
+    end
+    
+    function choosingCriterium = getPOICriterium(obj, useMean, population)
+      choosingCriterium = zeros(obj.modelsCount,1);
+      X = population.x';
+      for i=1:obj.modelsCount
+        [y, sd2] = obj.models{i,1}.predict(X); 
+        fmin = min(obj.models{i,1}.getDataset_y());
+        fmax = max(obj.models{i,1}.getDataset_y());
+        target = fmin - 0.05 * (fmax - fmin);
+        output = getPOI(X, y, sd2, target);
+        if (useMean)
+          choosingCriterium(i) = mean(output);
+        else
+          choosingCriterium(i) = max(output);
+        end
+      end
+    end
+    
+    function choosingCriterium = getEICriterium(obj, useMean, population)
+      choosingCriterium = zeros(obj.modelsCount,1);
+      for i=1:obj.modelsCount
+        X = population.x';
+        [y, sd2] = obj.models{i,1}.predict(X); 
+        fmin = min(obj.models{i,1}.getDataset_y());
+        output = getEI(X, y, sd2, fmin);
+        if (useMean)
+          choosingCriterium(i) = mean(output);
+        else
+          choosingCriterium(i) = max(output);
+        end
       end
     end
 
