@@ -33,7 +33,6 @@ function [aggRDE_table, aggMSE_table, RDEs, MSEs] = modelStatistics(modelFolders
 % [ ]  choose one method of saving numerical results (arrays, or cell arrays)
 
 
-
   % Default input parameters settings
   if (~exist('functions', 'var') || isempty(functions))
     functions = 1:24; end
@@ -60,8 +59,8 @@ function [aggRDE_table, aggMSE_table, RDEs, MSEs] = modelStatistics(modelFolders
 
   % take all *model_* directories in the given directory if not directories
   % *model_* given
+  ds = load(fullfile(modelFolders, 'dataset/DTS_005.mat'));
   modelFolders = expandModelSubdirs(modelFolders);
-
   if (isempty(opts.savedModelStatistics))
     % load the results from individual model-testing results files
 
@@ -117,7 +116,16 @@ function [aggRDE_table, aggMSE_table, RDEs, MSEs] = modelStatistics(modelFolders
               % save the statistics into respective resulting cell arrays
               RDEs{i_model, i_func, i_dim} = data.stats.rde(data_instances, snapshots);
               MSEs{i_model, i_func, i_dim} = data.stats.mse(data_instances, snapshots);
-              MAEs{i_model, i_func, i_dim} = data.stats.mae(data_instances, snapshots);
+              temp_maes = Inf(length(snapshots), 1);
+              for i_inst = 1:length(instances) 
+                for i_sn = 1:length(snapshots)
+                  sn_number = snapshots(i_sn);
+                  testSetY = ds.ds{i_func, i_dim, i_inst}.testSetY{sn_number};
+                  testSetModeled = data.y_models{i_inst, sn_number};
+                  temp_maes(i_sn) = sum(abs(testSetY - testSetModeled))/length(testSetModeled);
+                end
+              end
+              MAEs{i_model, i_func, i_dim} = mean(temp_maes);
               if (isfield(data, 'models'))
                 isTrained{i_model, i_func, i_dim} = cellfun( ...
                     @(m) m.isTrained(), data.models(data_instances, snapshots) );
