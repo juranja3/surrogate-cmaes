@@ -5,8 +5,13 @@ function [stats, models, y_models] = testOneModel(modelType, modelOpts, ds, nSna
 %   modelType   - type of tested model acc. to ModelFactory | string
 %   modelOpts   - options of the tested model | struct
 %   ds          - dataset for testing | struct
-%   nSnapshots  - the number of snapshots recorded as a dataset per CMA-ES run
-%   opts        - other options and settings (e.g.  opts.statistics)
+%   nSnapshots  - the number of snapshots recorded as a dataset per CMA-ES run;
+%                 there must be the same number of datasets in 'ds.testSetX'
+%   opts        - other options and settings:
+%       .statistics      -- names of statistics to calculate; default: {'mse'}
+%                           | cell-array of strings
+%       .snapshotsToTest -- array of snapshots integer indices to test 
+%                           default: [1:nSnapshots] | array of integers
 %
 % Output:
 %   stats       - cell array of structures with calculated statistics (one per snapshot)
@@ -26,6 +31,7 @@ function [stats, models, y_models] = testOneModel(modelType, modelOpts, ds, nSna
     nSnapshots = length(ds.testSetX);
   end
   opts.statistics = defopts(opts, 'statistics', { 'mse' });
+  opts.snapshotsToTest = defopts(opts, 'snapshotsToTest', [1:nSnapshots]);
 
   % prepare output fields
   for st = 1:length(opts.statistics)

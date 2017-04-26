@@ -8,8 +8,10 @@ defaultParameterSets = struct( ...
   'hyp',            { {struct('lik', log(0.01), 'cov', log([0.5; 2]))} });
 printBestSettingsDefinition = false;
 
-maxRank = 20;
-minTrainedPerc = 0.9;
+maxRank = 25;
+minTrainedPerc = 0.7;
+% take ranks according to the i-th statistic
+colStat = 1;
 
 bestSettings = cell(length(dimensions),1);
 aggRDE_nHeaderCols = 3;
@@ -40,8 +42,7 @@ for dim_i = 1:length(dimensions)
       % take rows which belong to the considered dimension/snapshot
       % combination
       rows = (aggRDE_table.dim == dim) & (aggRDE_table.snapshot == snp);
-      % take ranks according to the 2nd statistic
-      colStat = 2;
+      % take ranks according to the chosen statistic
       modelRanks(:,(func-1)*nSnapshots + snp_i) = ranking(cell2mat(aggRDE(rows, aggRDE_nHeaderCols+colStat + ((func-1)*aggRDE_nColsPerFunction)))');
       % # of train success should be in the 3rd column
       colNTrained = 3;
@@ -110,9 +111,11 @@ for dim_i = 1:length(dimensions)
     howMuchWillCover = sum(boolSets(:, ~isCovered), 2);
     % sets the number to zero for already chosen sets
     howMuchWillCover(chosenSets) = 0;
+    % re-weight the sets with their average/summed covering rank
+    weights = howMuchWillCover ./ sum(modelRanks(:, ~isCovered), 2);
     % take all the settings with the maximal covering property
-    nMaxCovers = max(howMuchWillCover);
-    maxCovered = find(howMuchWillCover == nMaxCovers);
+    maxWeight = max(weights);
+    maxCovered = find(weights == maxWeight);
     % choose one of the max-covering sets:
     %   take such settings which has maximal covering number
     %   and is the first in sortedSettings (see above)
@@ -131,12 +134,20 @@ for dim_i = 1:length(dimensions)
   fprintf('The total number of settings in %dD is %d.\n', dim, sum(chosenSets));
 
   % Calculate statistics of each model
+  % take mean RDE statistic into modelMeanRDE (mean is calculated from instances)
+  colMean = 1;
   settingsHashes = cellfun(@modelHash, folderModelOptions, 'UniformOutput', false)';
+
   for m = 1:nSettings
     hash = settingsHashes{m};
+
+    % take all rows corresponding to the actual settings' hash
     rows = (aggRDE_table.dim == dim) & cellfun(@(x) strcmpi(x, hash), aggRDE_table.hash);
-    rdeMatrix = cell2mat(aggRDE(rows, (aggRDE_nHeaderCols+1):aggRDE_nColsPerFunction:end));
+    rdeMatrix = cell2mat(aggRDE(rows, (aggRDE_nHeaderCols+colMean):aggRDE_nColsPerFunction:end));
     modelMeanRDE(m, dim_i) = mean(mean(rdeMatrix));
+
+    % calculate also statistics based only on the functions/snapshots
+    % which are covered by respective settings
     rdeMatrixCovered = rdeMatrix;
     modelFunctionsCovered{m, dim_i} = false(1,length(functions));
     for sni = 1:nSnapshots

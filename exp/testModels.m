@@ -14,6 +14,7 @@ function modelFolder = testModels(modelOptions, opts, funcToTest, dimsToTest, in
 %       .exppath_short  - directory with experiments subdirectories | string
 %       .statistics     - cell-array of statistics' names | cell array of strings
 %       .rewrite_results - whether to rewrite already saved results | bool
+%       .saveModels     - whether the models should be saved, too, default FALSE | bool
 %   funcToTest         - functions to test | array of integers
 %   dimsToTest         - dimensions to test | array of integers
 %   instToTest         - dimensions to test | array of integers
@@ -52,6 +53,7 @@ function modelFolder = testModels(modelOptions, opts, funcToTest, dimsToTest, in
   opts.maxEvals = defopts(opts, 'maxEvals', 250);
   opts.exppath_short = defopts(opts, 'exppath_short', fullfile('exp', 'experiments'));
   opts.statistics = defopts(opts, 'statistics', { 'mse' });
+  opts.saveModels = defopts(opts, 'saveModels', false);
 
   % Load the dataset and its parameters
   assert(isfield(opts, 'dataset'), 'opts does not include a dataset');
@@ -110,7 +112,11 @@ function modelFolder = testModels(modelOptions, opts, funcToTest, dimsToTest, in
         if (exist(modelFile, 'file') && ~opts.rewrite_results)
           % there are some already calculated results, try to load them and continue
           try
-            oldResults = load(modelFile, 'stats', 'models', 'y_models', 'instances', 'modelOptions', 'fun', 'dim');
+            if (opts.saveModels)
+              oldResults = load(modelFile, 'stats', 'models', 'y_models', 'instances', 'modelOptions', 'fun', 'dim');
+            else
+              oldResults = load(modelFile, 'stats', 'y_models', 'instances', 'modelOptions', 'fun', 'dim');
+            end
             finishedInstances = ismember(instToTest, oldResults.instances);
           catch err
             warning('File %s is corrupted. Will be rewritten.', modelFile);

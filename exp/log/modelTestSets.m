@@ -87,7 +87,7 @@ function ds = modelTestSets(exp_id, fun, dim, inst, opts)
   else
     f_ds = struct('ds', {{}}, 'fun', {[]}, 'dim', {[]}, 'inst', {[]}, 'maxEval', {opts.maxEval});
   end
-  
+
   % prepare output dataset
   ds = cell(length(fun), length(dim), length(inst));
 
