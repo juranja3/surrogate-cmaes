@@ -7,20 +7,57 @@ defaultParameterSets = struct( ...
   'trainAlgorithm', { {'fmincon'} }, ...
   'hyp',            { {struct('lik', log(0.01), 'cov', log([0.5; 2]))} });
 printBestSettingsDefinition = false;
+includeARD = false;
+include5dim = false;
+includeMeanLinear = false;
 
-maxRank = 25;
-minTrainedPerc = 0.7;
-% take ranks according to the i-th statistic
-colStat = 1;
+if (~includeARD || ~include5dim || ~includeMeanLinear)
+  % Omit ARD covariance functions & 5*dim trainsetSizeMax
+  nonARD_settings = cellfun(@(x) (includeARD | ~strcmp(x.covFcn, '{@covSEard}')) ...
+      & (include5dim | ~strcmp(x.trainsetSizeMax, '5*dim')) ...
+      & (includeMeanLinear | ~strcmp(x.meanFcn, 'meanLinear')), folderModelOptions);
+  folderModelOptions = folderModelOptions(nonARD_settings);
+  modelFolders = modelFolders(nonARD_settings);
+  isTrained = isTrained(nonARD_settings, :, :);
+  RDEs = RDEs(nonARD_settings, :, :);
+  MSEs = MSEs(nonARD_settings, :, :);
+  nonARD_tables = (includeARD | ~strcmp(aggRDE_table.covFcn, '{@covSEard}')) ...
+      & (include5dim | ~strcmp(aggRDE_table.trainsetSizeMax, '5*dim')) ...
+      & (includeMeanLinear | ~strcmp(aggRDE_table.meanFcn, 'meanLinear'));
+  aggRDE = aggRDE(nonARD_tables, :);
+  aggRDE_table = aggRDE_table(nonARD_tables, :);
+  aggMSE = aggMSE(nonARD_tables, :);
+  aggMSE_table = aggMSE_table(nonARD_tables, :);
+end
+
+settingsHashes = cellfun(@modelHash, folderModelOptions, 'UniformOutput', false)';
+
+maxRank         = defopts(opts, 'maxRank', 25);
+minTrainedPerc  = defopts(opts, 'minTrainedPerc', 0.85);
+% take only models with 'ranks <= maxRank' according
+% to the i-th statistic, 1 = mean, 2 = 75%-quantile
+colStat         = defopts(opts, 'colStat', 2);
+% consider the following criterion when choosing the best settings
+% for choosing for Set Cover problem
+colSetCover     = defopts(opts, 'colSetCover', colStat);
+% transformation of the number of covered functions/snapshots
+% ('fsCovered' is a column vector of these number for each settings)
+% and ranks of respective models for covering functions/snapshots
+% ('mRanks' is a matrix of size 'nSettings x sum(~isCovered)')
+% f_weight        = defopts(opts, 'f_weight', @(fsCovered, mRanks) sqrt(fsCovered) ./ sum(mRanks.^(1.5), 2));
+f_weight        = defopts(opts, 'f_weight', ...
+    @(nCover, modelErrors) (nCover.^(3))./sum(modelErrors, 2));
 
 bestSettings = cell(length(dimensions),1);
 aggRDE_nHeaderCols = 3;
 aggRDE_nColsPerFunction = 3;
+nSnapshots = length(snapshots);
 nSettings = length(folderModelOptions);
 modelMeanRDE = zeros(nSettings, length(dimensions));
 modelMeanRDECovered = zeros(nSettings, length(dimensions));
 modelMeanRankCovered = zeros(nSettings, length(dimensions));
 modelFunctionsCovered = cell(nSettings, length(dimensions));
+modelSnapshotsCovered = cell(nSettings, nSnapshots);
 
 for dim_i = 1:length(dimensions)
 
@@ -29,8 +66,8 @@ for dim_i = 1:length(dimensions)
   dim = dimensions(dim_i);
   nInstances = length(instances);
 
-  nSnapshots = length(snapshots);
   modelRanks = zeros(nSettings, length(functions)*nSnapshots);
+  modelErrors = zeros(nSettings, length(functions)*nSnapshots);
   nTrained   = zeros(nSettings, length(functions)*nSnapshots);
   dimId = find(dim == dimensions, 1);
   
@@ -43,8 +80,10 @@ for dim_i = 1:length(dimensions)
       % combination
       rows = (aggRDE_table.dim == dim) & (aggRDE_table.snapshot == snp);
       % take ranks according to the chosen statistic
-      modelRanks(:,(func-1)*nSnapshots + snp_i) = ranking(cell2mat(aggRDE(rows, aggRDE_nHeaderCols+colStat + ((func-1)*aggRDE_nColsPerFunction)))');
-      % # of train success should be in the 3rd column
+      modelRanks(:,(func-1)*nSnapshots + snp_i) = ranking(cell2mat(aggRDE(rows, aggRDE_nHeaderCols + colStat + ((func-1)*aggRDE_nColsPerFunction)))');
+      % take this error values for choosing models in Set Cover problem
+      modelErrors(:,(func-1)*nSnapshots + snp_i) = ranking(cell2mat(aggRDE(rows, aggRDE_nHeaderCols + colSetCover + ((func-1)*aggRDE_nColsPerFunction)))');
+      % # of train success should be in the 3rd column\
       colNTrained = 3;
       nTrained(:,(func-1)*nSnapshots + snp_i)   = cell2mat(aggRDE(rows, aggRDE_nHeaderCols+colNTrained + ((func-1)*aggRDE_nColsPerFunction)))';
     end
@@ -111,8 +150,9 @@ for dim_i = 1:length(dimensions)
     howMuchWillCover = sum(boolSets(:, ~isCovered), 2);
     % sets the number to zero for already chosen sets
     howMuchWillCover(chosenSets) = 0;
-    % re-weight the sets with their average/summed covering rank
-    weights = howMuchWillCover ./ sum(modelRanks(:, ~isCovered), 2);
+    % re-weight the sets with their Set Cover problem criterion
+    weights = f_weight(howMuchWillCover, ...
+        boolSets(:, ~isCovered) .* modelErrors(:, ~isCovered));
     % take all the settings with the maximal covering property
     maxWeight = max(weights);
     maxCovered = find(weights == maxWeight);
@@ -136,7 +176,6 @@ for dim_i = 1:length(dimensions)
   % Calculate statistics of each model
   % take mean RDE statistic into modelMeanRDE (mean is calculated from instances)
   colMean = 1;
-  settingsHashes = cellfun(@modelHash, folderModelOptions, 'UniformOutput', false)';
 
   for m = 1:nSettings
     hash = settingsHashes{m};
@@ -150,16 +189,18 @@ for dim_i = 1:length(dimensions)
     % which are covered by respective settings
     rdeMatrixCovered = rdeMatrix;
     modelFunctionsCovered{m, dim_i} = false(1,length(functions));
+    modelSnapshotsCovered{m, dim_i} = zeros(1,nSnapshots);
     for sni = 1:nSnapshots
       rdeMatrixCovered(sni, ~boolSets(m, sni:nSnapshots:end)) = NaN;
       modelFunctionsCovered{m, dim_i} = modelFunctionsCovered{m, dim_i} ...
           | boolSets(m, sni:nSnapshots:end);
+      modelSnapshotsCovered{m, dim_i}(sni) = sum(boolSets(m, sni:nSnapshots:end));
     end
     modelMeanRDECovered(m, dim_i) = mean(rdeMatrixCovered(~isnan(rdeMatrixCovered)));
     modelMeanRankCovered(m, dim_i) = mean(modelRanks(m, boolSets(m, :)));
   end
 
-  headerCols    = { 'settingNo', 'No_covered', 'avg_RDE', 'covrd_RDE', 'avg_rank', 'covrd_rank', 'covrd_funs' };
+  headerCols    = { 'settingNo', 'No_covered', 'avg_RDE', 'covrd_RDE', 'avg_rank', 'covrd_rank', 'covrd_funs', 'covrd_snp' };
   % multiFieldNames = { 'covFcn', 'trainsetType', 'trainRange', 'trainsetSizeMax', 'meanFcn' };
 
   nHeaderCols = length(headerCols);
@@ -173,6 +214,7 @@ for dim_i = 1:length(dimensions)
   bestSettings{dim_i}(2:end,6) = num2cell(modelMeanRankCovered(chosenSets, dim_i));   % mean ranks of the covered f/snp
   bestSettings{dim_i}(2:end,7) = cellfun(@(x) num2str(find(x)), ...
       modelFunctionsCovered(chosenSets, dim_i), 'UniformOutput', false);  % list of covered functions
+  bestSettings{dim_i}(2:end,8) = modelSnapshotsCovered(chosenSets, dim_i); % numbers of covered snaphots
 
   for opi = 1:length(multiFieldNames)
     opt = multiFieldNames{opi};
