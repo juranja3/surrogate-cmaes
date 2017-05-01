@@ -88,7 +88,7 @@ classdef ModelPool < Model
       obj.shiftMean = zeros(1, obj.dim);
       obj.shiftY    = 0;
       obj.stdY      = 1;
-      obj.bestModelSelection = defopts(modelOptions, 'bestModelSelection', 'mse');
+      obj.bestModelSelection = defopts(modelOptions, 'bestModelSelection', 'rdeAll');
 
       % general model prediction options
       obj.predictionType = defopts(modelOptions, 'predictionType', 'fValues');
@@ -104,17 +104,6 @@ classdef ModelPool < Model
         obj.models{i,1} = obj.createGpModel(i, xMean);
         obj.nTrainData = min(obj.models{i,1}.getNTrainData(),obj.nTrainData);
       end
-    end
-
-    function gpModel = createGpModel(obj, modelIndex, xMean)
-      newModelOptions = obj.modelPoolOptions.parameterSets(modelIndex);
-      newModelOptions.predictionType = obj.predictionType;
-      newModelOptions.transformCoordinates = obj.transformCoordinates;
-      newModelOptions.dimReduction = obj.dimReduction;
-      newModelOptions.options.normalizeY = obj.options.normalizeY;
-
-      gpModel = ModelFactory.createModel('gp', newModelOptions, xMean);
-
     end
 
     function nData = getNTrainData(obj)
@@ -148,7 +137,6 @@ classdef ModelPool < Model
 
           obj.models(i,:) = circshift(obj.models(i,:),[0,1]);
           obj.isModelTrained(i,:) = circshift(obj.isModelTrained(i,:),[0,1]);
-          obj.isModelTrained(i,1) = 0;
           obj.models{i,1} = obj.createGpModel(i, obj.xMean);
           obj.models{i,1} = obj.models{i,1}.train(X, y, stateVariables, sampleOpts, obj.archive, population);
 
@@ -156,6 +144,7 @@ classdef ModelPool < Model
             trainedModelsCount = trainedModelsCount+1;
             obj.isModelTrained(i,1) = 1;
           else
+            obj.isModelTrained(i,1) = 0;
             obj.models{i,1}.trainGeneration = -1;
           end
         end
@@ -186,7 +175,18 @@ classdef ModelPool < Model
 
   end
 
-  methods (Access = public)
+  methods (Access = protected)
+    function gpModel = createGpModel(obj, modelIndex, xMean)
+      newModelOptions = obj.modelPoolOptions.parameterSets(modelIndex);
+      newModelOptions.predictionType = obj.predictionType;
+      newModelOptions.transformCoordinates = obj.transformCoordinates;
+      newModelOptions.dimReduction = obj.dimReduction;
+      newModelOptions.options.normalizeY = obj.options.normalizeY;
+
+      gpModel = ModelFactory.createModel('gp', newModelOptions, xMean);
+      
+    end
+    
     function [bestModelIndex, choosingCriterium] = chooseBestModel(obj, lastGeneration, population)
 
       if (isempty(lastGeneration))
@@ -286,7 +286,7 @@ classdef ModelPool < Model
       end
     end
 
-    function choosingCriterium = getRdeAll(obj, ageOfTestedModels, population, mu)
+    function choosingCriterium = getRdeAll(obj, ageOfTestedModels, population)
       choosingCriterium = Inf(obj.modelsCount,1);
       for modelIndex=1:obj.modelsCount
         partialCriteriumValues = [];
