@@ -197,7 +197,7 @@ classdef ModelPool < Model
       for i = obj.historyLength+1 : -1 : obj.historyLength+1 - obj.maxGenerationShiftForModelChoice;
         trainedPercentile = mean(obj.isModelTrained(:,i));
 
-        if (trainedPercentile >= obj.minTrainedModelsPercentilForModelChoice)
+        if (trainedPercentile >= obj.minTrainedModelsPercentileForModelChoice)
           ageOfTestedModels = i;
           break;
         end

@@ -9,6 +9,6 @@ modelOptions.parameterSets = {struct('covFcn', {'{@covSEard}', '{@covSEiso}', '{
 % Full factorial design of the following parameters                          
 modelOptions.bestModelSelection = { 'mse' };
 modelOptions.historyLength      = { 3, 5, 7 };
-modelOptions.minTrainedModelsPercentilForModelChoice = {0.25, 0.5};
+modelOptions.minTrainedModelsPercentileForModelChoice = {0.25, 0.5};
 modelOptions.maxGenerationShiftForModelChoice = {0, 2};
                           
