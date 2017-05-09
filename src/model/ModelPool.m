@@ -58,7 +58,7 @@ classdef ModelPool < Model
       obj.xMean = xMean;
       obj.modelsCount = length(modelOptions.parameterSets);
       assert(obj.modelsCount ~= 0, 'ModelPool(): No model provided!');
-
+      obj.bestModelSelection = defopts(modelOptions, 'bestModelSelection', 'rdeAll');
       if (strcmpi(obj.bestModelSelection, 'likelihood')...
          || strcmpi(obj.bestModelSelection, 'poiavg')...
          || strcmpi(obj.bestModelSelection, 'poimax')...
@@ -88,7 +88,6 @@ classdef ModelPool < Model
       obj.shiftMean = zeros(1, obj.dim);
       obj.shiftY    = 0;
       obj.stdY      = 1;
-      obj.bestModelSelection = defopts(modelOptions, 'bestModelSelection', 'rdeAll');
 
       % general model prediction options
       obj.predictionType = defopts(modelOptions, 'predictionType', 'fValues');
