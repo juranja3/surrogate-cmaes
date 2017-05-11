@@ -46,7 +46,7 @@ classdef ModelPool < Model
     retrainPeriod
     nTrainData            % min of getNTrainData of all created models
     xMean
-    minTrainedModelsPercentilForModelChoice % if percentile of oldest models that are trained
+    minTrainedModelsPercentileForModelChoice % if percentile of oldest models that are trained
                                             % drops below this value, we try newer generations of models
     maxGenerationShiftForModelChoice  % stops trying to find trained generation
                                       % and switches to likelihood after this value of searched generations
@@ -58,7 +58,9 @@ classdef ModelPool < Model
       obj.xMean = xMean;
       obj.modelsCount = length(modelOptions.parameterSets);
       assert(obj.modelsCount ~= 0, 'ModelPool(): No model provided!');
+	  
       obj.bestModelSelection = defopts(modelOptions, 'bestModelSelection', 'rdeAll');
+	  
       if (strcmpi(obj.bestModelSelection, 'likelihood')...
          || strcmpi(obj.bestModelSelection, 'poiavg')...
          || strcmpi(obj.bestModelSelection, 'poimax')...
@@ -72,7 +74,7 @@ classdef ModelPool < Model
           warning('ModelPool: history length needs to be at least 2 in order to choose from at least 1 point, choosing 2 as value.');
           obj.historyLength = 2;
         end
-        obj.minTrainedModelsPercentilForModelChoice = defopts(modelOptions, 'minTrainedModelsPercentilForModelChoice', 0.25);
+        obj.minTrainedModelsPercentileForModelChoice = defopts(modelOptions, 'minTrainedModelsPercentileForModelChoice', 0.25);
         obj.maxGenerationShiftForModelChoice = defopts(modelOptions, 'maxGenerationShiftForModelChoice', 1);
         if obj.maxGenerationShiftForModelChoice >= obj.historyLength -1
           warning('ModelPool: maxGenerationShiftForModelChoice is too high, choosing %d as value.', obj.historyLength - 2)
